@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { existsSync } from 'node:fs';
 import { createApp } from './app.js';
 import { config } from './config.js';
 import { openBibleDatabase } from './database.js';
@@ -7,8 +8,9 @@ import { BibleRepository } from './repository.js';
 try {
   const database = await openBibleDatabase(config.archivePath, config.databasePath);
   const repository = new BibleRepository(database);
-  const staticDirectory = process.env.NODE_ENV === 'production'
-    ? path.join(config.projectRoot, 'dist')
+  const builtClient = path.join(config.projectRoot, 'dist');
+  const staticDirectory = existsSync(path.join(builtClient, 'index.html'))
+    ? builtClient
     : undefined;
   const app = createApp(repository, staticDirectory);
   const server = app.listen(config.port, () => {

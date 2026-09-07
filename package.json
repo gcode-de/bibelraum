@@ -10,28 +10,28 @@
     "dev": "concurrently -k -n API,WEB -c blue,magenta \"npm:dev:server\" \"npm:dev:client\"",
     "dev:client": "vite",
     "dev:server": "tsx watch server/index.ts",
-    "build": "tsc -b && vite build",
-    "start": "NODE_ENV=production tsx server/index.ts",
+    "build": "tsc -b && tsc -p tsconfig.server-build.json && vite build",
+    "start": "node dist-server/index.js",
     "test": "node --import tsx --test server/**/*.test.ts",
     "typecheck": "tsc -b"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
     "express": "latest",
-    "lucide-react": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "unzipper": "latest",
-    "vite": "latest"
+    "unzipper": "latest"
   },
   "devDependencies": {
+    "@vitejs/plugin-react": "latest",
     "@types/express": "latest",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@types/unzipper": "latest",
     "concurrently": "latest",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
     "tsx": "latest",
-    "typescript": "latest"
+    "typescript": "latest",
+    "vite": "latest"
   }
 }
