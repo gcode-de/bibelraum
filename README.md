@@ -109,6 +109,15 @@ in Portainer hinterlegt werden.
 Für ein Update zuerst die GitHub Action durchlaufen lassen und anschließend in
 Portainer beim Stack **Pull latest image** und **Update the stack** wählen.
 
+### Podman mit systemd/Quadlet
+
+Für einen reinen Podman-Host liegen unter `deploy/podman` passende Quadlet-Dateien.
+Nach dem Kopieren nach `/etc/containers/systemd/` werden sie mit
+`systemctl daemon-reload` und `systemctl start bibelraum.service` aktiviert.
+Der Generator hängt den Dienst über den `[Install]`-Abschnitt automatisch in
+`multi-user.target` ein. Das Image wird beim Start aus Docker Hub bezogen; automatische
+Registry-Updates können über `podman-auto-update.timer` eingeschaltet werden.
+
 ### Lokaler Container-Build
 
 Vom Wurzelverzeichnis des Git-Repositories aus:

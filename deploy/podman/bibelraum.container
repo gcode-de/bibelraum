@@ -1,0 +1,30 @@
+[Unit]
+Description=Bibelraum Bible reader
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+Image=docker.io/sgesang/bibelraum:latest
+ContainerName=bibelraum
+PublishPort=4174:4174
+Environment=PORT=4174
+Environment=BIBLE_ARCHIVE=/app/input/bibles.zip
+Environment=BIBLE_DB=/app/data/bibelraum.sqlite
+Volume=/opt/bibelraum/bibles.zip:/app/input/bibles.zip:ro
+Volume=bibelraum-data.volume:/app/data
+ReadOnly=true
+Tmpfs=/tmp:size=256m,mode=1777
+NoNewPrivileges=true
+AutoUpdate=registry
+HealthCmd=node -e "fetch('http://127.0.0.1:4174/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+HealthInterval=30s
+HealthTimeout=5s
+HealthStartPeriod=45s
+HealthRetries=3
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
