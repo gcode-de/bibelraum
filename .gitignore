@@ -1,0 +1,10 @@
+.DS_Store
+data/
+dist/
+dist-server/
+node_modules/
+coverage/
+*.log
+*.tsbuildinfo
+.env
+OpenLP-Bibeln-DE-*.zip

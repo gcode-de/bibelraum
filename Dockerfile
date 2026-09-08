@@ -1,10 +1,10 @@
 FROM node:24-bookworm-slim AS build
 
 WORKDIR /app
-COPY webapp/package.json webapp/package-lock.json ./
+COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY webapp/ ./
+COPY . ./
 RUN npm run build && npm prune --omit=dev
 
 FROM node:24-bookworm-slim AS runtime

@@ -19,11 +19,10 @@ gemeinsame, für die Web-App optimierte SQLite-Datenbank importiert.
 
 ## Schnellstart
 
-Voraussetzung ist Node.js 22.5 oder neuer. Das ZIP-Archiv liegt standardmäßig
-direkt über diesem Ordner, so wie es in diesem Repository bereits der Fall ist.
+Voraussetzung ist Node.js 22.5 oder neuer. Lege das ZIP-Archiv standardmäßig
+direkt in diesem Projektordner ab; es wird von Git ignoriert.
 
 ```bash
-cd webapp
 npm install
 npm run build
 npm start
@@ -31,7 +30,7 @@ npm start
 
 Danach ist Bibelraum unter [http://localhost:4174](http://localhost:4174)
 erreichbar. Der erste Start dauert einige Sekunden, weil die App das Archiv
-einmalig einliest. Die erzeugte Datei liegt unter `webapp/data/bibelraum.sqlite`
+einmalig einliest. Die erzeugte Datei liegt unter `data/bibelraum.sqlite`
 und wird nicht in Git aufgenommen. Ändert sich das Archiv, wird sie beim nächsten
 Start automatisch neu aufgebaut.
 
@@ -74,7 +73,7 @@ Repository-Secrets hinterlegen:
 - `DOCKERHUB_USERNAME`: Docker-Hub-Benutzername
 - `DOCKERHUB_TOKEN`: der gerade erzeugte Access Token
 
-Ein Push auf `master`, ein Tag wie `v1.0.0` oder ein manueller Start unter
+Ein Push auf `main`, ein Tag wie `v1.0.0` oder ein manueller Start unter
 **Actions → Docker image → Run workflow** baut und veröffentlicht das Image.
 
 ### 2. Archiv auf dem Docker-Host ablegen
@@ -115,16 +114,18 @@ Portainer beim Stack **Pull latest image** und **Update the stack** wählen.
 Vom Wurzelverzeichnis des Git-Repositories aus:
 
 ```bash
-docker build -f webapp/Dockerfile -t bibelraum:local .
+docker build -t bibelraum:local .
 ```
 
 ## Projektstruktur
 
 ```text
-webapp/
+.
 ├── server/          Node.js-/Express-API und SQLite-Import
 ├── src/             React-Oberfläche
 ├── data/            lokal erzeugte App-Datenbank (von Git ignoriert)
+├── Dockerfile
+├── docker-compose.yml
 ├── index.html
 └── vite.config.ts
 ```
