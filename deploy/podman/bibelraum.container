@@ -16,7 +16,7 @@ ReadOnly=true
 Tmpfs=/tmp:size=256m,mode=1777
 NoNewPrivileges=true
 AutoUpdate=registry
-HealthCmd=node -e "fetch('http://127.0.0.1:4174/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+HealthCmd=node /app/dist-server/healthcheck.js
 HealthInterval=30s
 HealthTimeout=5s
 HealthStartPeriod=45s

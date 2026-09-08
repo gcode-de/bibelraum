@@ -18,7 +18,7 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4174/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "dist-server/healthcheck.js"]
       interval: 30s
       timeout: 5s
       start_period: 45s
