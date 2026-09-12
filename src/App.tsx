@@ -5,12 +5,16 @@ import {
   Check,
   ChevronDown,
   CircleAlert,
+  Copy,
   Columns3,
+  Highlighter,
   Library,
+  Link2,
   Menu,
   Moon,
   Plus,
   Search,
+  Share2,
   SlidersHorizontal,
   Sun,
   X,
@@ -38,7 +42,23 @@ function getInitialLocation() {
     chapter: Number.isInteger(chapter) && chapter > 0 ? chapter : DEFAULT_CHAPTER,
     translation: params.get('uebersetzung')?.toUpperCase() ||
       localStorage.getItem('bibelraum.translation') || DEFAULT_TRANSLATION,
+    verse: Number(params.get('vers')) || null,
   };
+}
+
+type SelectedVerse = {
+  verse: number;
+  text: string;
+  translationCode: string;
+};
+
+function loadMarkedVerses() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('bibelraum.marked-verses') ?? '[]');
+    return Array.isArray(saved) ? saved.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
 }
 
 function getInitialTheme() {
@@ -67,13 +87,19 @@ export function App() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [highlightedVerse, setHighlightedVerse] = useState<number | null>(null);
+  const [highlightedVerse, setHighlightedVerse] = useState<number | null>(initial.verse);
+  const [selectedVerse, setSelectedVerse] = useState<SelectedVerse | null>(null);
+  const [markedVerses, setMarkedVerses] = useState<string[]>(loadMarkedVerses);
+  const [verseActionMessage, setVerseActionMessage] = useState('');
   const [readerChromeVisible, setReaderChromeVisible] = useState(true);
   const searchInput = useRef<HTMLInputElement>(null);
   const lastScrollY = useRef(window.scrollY);
 
   const primaryCode = selectedCodes[0];
   const currentBook = books.find((book) => book.id === bookId);
+  const selectedVerseKey = selectedVerse
+    ? `${selectedVerse.translationCode}:${bookId}:${chapter}:${selectedVerse.verse}`
+    : null;
   const readerStyle = {
     '--reader-font-size': `${readerSettings.fontSize}px`,
     '--reader-line-height': String(readerSettings.lineHeight),
@@ -172,6 +198,10 @@ export function App() {
   }, [readerSettings]);
 
   useEffect(() => {
+    localStorage.setItem('bibelraum.marked-verses', JSON.stringify(markedVerses));
+  }, [markedVerses]);
+
+  useEffect(() => {
     if (!readerSettingsOpen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -216,6 +246,7 @@ export function App() {
 
   const goTo = useCallback((location: PassageLocation | null) => {
     if (!location) return;
+    setSelectedVerse(null);
     setBookId(location.bookId);
     setChapter(location.chapter);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -238,6 +269,7 @@ export function App() {
   }, [goTo, passage]);
 
   function chooseBook(nextBookId: number) {
+    setSelectedVerse(null);
     setBookId(nextBookId);
     setChapter(1);
     setSidebarOpen(false);
@@ -246,6 +278,7 @@ export function App() {
   }
 
   function chooseChapter(nextBookId: number, nextChapter: number) {
+    setSelectedVerse(null);
     setBookId(nextBookId);
     setChapter(nextChapter);
     setMobileExpandedBookId(nextBookId);
@@ -284,11 +317,41 @@ export function App() {
   }
 
   function openSearchResult(result: SearchResult) {
+    setSelectedVerse(null);
     setBookId(result.bookId);
     setChapter(result.chapter);
     setHighlightedVerse(result.verse);
     setSearchOpen(false);
     setSidebarOpen(false);
+  }
+
+  function verseReference(verse: SelectedVerse) {
+    return `${currentBook?.name ?? passage?.book.name ?? 'Bibel'} ${chapter},${verse.verse} (${verse.translationCode})`;
+  }
+
+  async function copyText(value: string, message: string) {
+    await navigator.clipboard.writeText(value);
+    setVerseActionMessage(message);
+    window.setTimeout(() => setVerseActionMessage(''), 1800);
+  }
+
+  async function shareVerse() {
+    if (!selectedVerse) return;
+    const text = `${verseReference(selectedVerse)}\n${selectedVerse.text}`;
+    const url = new URL(window.location.href);
+    url.searchParams.set('vers', String(selectedVerse.verse));
+    if (navigator.share) {
+      await navigator.share({ title: verseReference(selectedVerse), text, url: url.toString() });
+    } else {
+      await copyText(`${text}\n${url}`, 'Vers und Link kopiert');
+    }
+  }
+
+  function toggleVerseMark() {
+    if (!selectedVerseKey) return;
+    setMarkedVerses((current) => current.includes(selectedVerseKey)
+      ? current.filter((key) => key !== selectedVerseKey)
+      : [...current, selectedVerseKey]);
   }
 
   return (
@@ -492,14 +555,26 @@ export function App() {
                       )}
                       <div className="verses">
                         {translation.verses.map((item) => (
-                          <p
+                          <button
+                            type="button"
                             id={index === 0 ? `vers-${item.verse}` : undefined}
-                            className={highlightedVerse === item.verse ? 'is-highlighted' : ''}
+                            className={[
+                              'verse',
+                              highlightedVerse === item.verse ? 'is-highlighted' : '',
+                              selectedVerse?.verse === item.verse && selectedVerse.translationCode === translation.code ? 'is-selected' : '',
+                              markedVerses.includes(`${translation.code}:${bookId}:${chapter}:${item.verse}`) ? 'is-marked' : '',
+                            ].filter(Boolean).join(' ')}
+                            onClick={() => setSelectedVerse((current) => (
+                              current?.verse === item.verse && current.translationCode === translation.code
+                                ? null
+                                : { ...item, translationCode: translation.code }
+                            ))}
+                            aria-pressed={selectedVerse?.verse === item.verse && selectedVerse.translationCode === translation.code}
                             key={item.verse}
                           >
                             <sup>{item.verse}</sup>
                             {item.text}
-                          </p>
+                          </button>
                         ))}
                       </div>
                     </article>
@@ -520,6 +595,34 @@ export function App() {
           )}
         </div>
       </main>
+
+      {selectedVerse && (
+        <div className="verse-actions" role="toolbar" aria-label={`Aktionen für ${verseReference(selectedVerse)}`}>
+          <div className="verse-actions-reference">
+            <b>{verseReference(selectedVerse)}</b>
+            <span>{verseActionMessage || 'Vers ausgewählt'}</span>
+          </div>
+          <button onClick={() => copyText(`${verseReference(selectedVerse)}\n${selectedVerse.text}`, 'Vers kopiert')}>
+            <Copy size={18} /><span>Kopieren</span>
+          </button>
+          <button onClick={shareVerse}>
+            <Share2 size={18} /><span>Teilen</span>
+          </button>
+          <button onClick={() => {
+            const url = new URL(window.location.href);
+            url.searchParams.set('vers', String(selectedVerse.verse));
+            copyText(url.toString(), 'Link kopiert');
+          }}>
+            <Link2 size={18} /><span>Link</span>
+          </button>
+          <button className={selectedVerseKey && markedVerses.includes(selectedVerseKey) ? 'active' : ''} onClick={toggleVerseMark}>
+            <Highlighter size={18} /><span>Markieren</span>
+          </button>
+          <button className="verse-actions-close" onClick={() => setSelectedVerse(null)} aria-label="Versauswahl schließen">
+            <X size={19} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
