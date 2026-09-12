@@ -25,6 +25,12 @@ before(() => {
       (1, 2, 1, 1, 'Dies sind die Namen der Söhne Israels.'),
       (2, 1, 1, 1, 'Im Anfang schuf Gott die Himmel und die Erde.'),
       (2, 1, 2, 1, 'So wurden die Himmel und die Erde vollendet.');
+    INSERT INTO study_sources (id, slug, translation_code, title, author)
+      VALUES (1, 'test-kommentar', 'LUT', 'Testkommentar', 'Ada Beispiel');
+    INSERT INTO study_comments (id, source_id, text)
+      VALUES (1, 1, 'Eine Studienanmerkung zum ersten Vers.');
+    INSERT INTO study_comment_links (comment_id, book_ref_id, chapter, verse, source_url)
+      VALUES (1, 1, 1, 1, 'https://example.test/comment');
   `);
   repository = new BibleRepository(database);
 });
@@ -46,11 +52,21 @@ test('loads a passage in the requested translation order', () => {
   assert.equal(passage?.book.name, '1. Mose');
   assert.equal(passage?.translations[0].code, 'ELB');
   assert.equal(passage?.translations[1].verses[0].text, 'Am Anfang schuf Gott Himmel und Erde.');
+  assert.equal(passage?.translations[1].verses[0].commentCount, 1);
+  assert.equal(passage?.translations[0].verses[0].commentCount, 0);
   assert.deepEqual(passage?.next ? { ...passage.next } : null, {
     bookId: 1,
     chapter: 2,
     bookName: '1. Mose',
   });
+});
+
+test('loads study comments only for their translation and verse', () => {
+  const comments = repository.getStudyComments('LUT', 1, 1, 1);
+  assert.equal(comments.length, 1);
+  assert.equal(comments[0].sourceTitle, 'Testkommentar');
+  assert.equal(comments[0].text, 'Eine Studienanmerkung zum ersten Vers.');
+  assert.equal(repository.getStudyComments('ELB', 1, 1, 1).length, 0);
 });
 
 test('finds verses containing all search terms', () => {

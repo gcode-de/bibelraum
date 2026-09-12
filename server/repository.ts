@@ -8,6 +8,16 @@ type TranslationRow = {
   verseCount: number;
 };
 
+type StudyCommentRow = {
+  id: number;
+  sourceTitle: string;
+  author: string;
+  copyright: string;
+  usageNotice: string;
+  text: string;
+  sourceUrl: string;
+};
+
 export class BibleRepository {
   constructor(private readonly db: DatabaseSync) {}
 
@@ -73,18 +83,64 @@ export class BibleRepository {
       ORDER BY verse
     `);
 
-    const translations = translationRows.map((translation) => ({
-      code: translation.code,
-      name: translation.name,
-      verses: versesStatement.all(translation.id, bookId, chapter) as Array<{
+    const commentCountsStatement = this.db.prepare(`
+      SELECT links.verse, COUNT(*) AS commentCount
+      FROM study_comment_links links
+      JOIN study_comments comments ON comments.id = links.comment_id
+      JOIN study_sources sources ON sources.id = comments.source_id
+      WHERE sources.translation_code = ? AND links.book_ref_id = ? AND links.chapter = ?
+      GROUP BY links.verse
+    `);
+
+    const translations = translationRows.map((translation) => {
+      const commentCounts = new Map(
+        (commentCountsStatement.all(translation.code, bookId, chapter) as Array<{
+          verse: number;
+          commentCount: number;
+        }>).map((row) => [row.verse, row.commentCount]),
+      );
+      const verses = versesStatement.all(translation.id, bookId, chapter) as Array<{
         verse: number;
         text: string;
-      }>,
-    }));
+      }>;
+      return {
+        code: translation.code,
+        name: translation.name,
+        verses: verses.map((verse) => ({
+          ...verse,
+          commentCount: commentCounts.get(verse.verse) ?? 0,
+        })),
+      };
+    });
 
     const previous = this.getAdjacentChapter(primary.id, bookId, chapter, -1);
     const next = this.getAdjacentChapter(primary.id, bookId, chapter, 1);
     return { book, chapter, previous, next, translations };
+  }
+
+  getStudyComments(
+    translationCode: string,
+    bookId: number,
+    chapter: number,
+    verse: number,
+  ) {
+    return this.db.prepare(`
+      SELECT comments.id,
+             sources.title AS sourceTitle,
+             sources.author,
+             sources.copyright,
+             sources.usage_notice AS usageNotice,
+             comments.text,
+             links.source_url AS sourceUrl
+      FROM study_comment_links links
+      JOIN study_comments comments ON comments.id = links.comment_id
+      JOIN study_sources sources ON sources.id = comments.source_id
+      WHERE sources.translation_code = ?
+        AND links.book_ref_id = ?
+        AND links.chapter = ?
+        AND links.verse = ?
+      ORDER BY sources.title COLLATE NOCASE, comments.id
+    `).all(translationCode, bookId, chapter, verse) as StudyCommentRow[];
   }
 
   private getAdjacentChapter(

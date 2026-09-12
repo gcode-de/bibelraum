@@ -9,6 +9,9 @@ export const config = {
   archivePath: path.resolve(
     process.env.BIBLE_ARCHIVE ?? path.join(projectRoot, 'OpenLP-Bibeln-DE-2026-09-07.zip'),
   ),
+  studyArchivePath: process.env.STUDY_ARCHIVE
+    ? path.resolve(process.env.STUDY_ARCHIVE)
+    : undefined,
   databasePath: path.resolve(
     process.env.BIBLE_DB ?? path.join(projectRoot, 'data', 'bibelraum.sqlite'),
   ),

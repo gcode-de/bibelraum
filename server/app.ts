@@ -51,6 +51,20 @@ export function createApp(repository: BibleRepository, staticDirectory?: string)
     response.json(passage);
   });
 
+  app.get('/api/comments/:bookId/:chapter/:verse', (request, response) => {
+    const bookId = positiveInteger(request.params.bookId);
+    const chapter = positiveInteger(request.params.chapter);
+    const verse = positiveInteger(request.params.verse);
+    const translation = String(request.query.translation ?? 'SLT').toUpperCase();
+
+    if (!bookId || !chapter || !verse || !translation) {
+      response.status(400).json({ error: 'Ungültige Stellenangabe.' });
+      return;
+    }
+
+    response.json(repository.getStudyComments(translation, bookId, chapter, verse));
+  });
+
   app.get('/api/search', (request, response) => {
     const query = String(request.query.q ?? '').trim();
     const translation = String(request.query.translation ?? 'LUT').toUpperCase();

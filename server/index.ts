@@ -6,7 +6,11 @@ import { openBibleDatabase } from './database.js';
 import { BibleRepository } from './repository.js';
 
 try {
-  const database = await openBibleDatabase(config.archivePath, config.databasePath);
+  const database = await openBibleDatabase(
+    config.archivePath,
+    config.databasePath,
+    config.studyArchivePath,
+  );
   const repository = new BibleRepository(database);
   const builtClient = path.join(config.projectRoot, 'dist');
   const staticDirectory = existsSync(path.join(builtClient, 'index.html'))
