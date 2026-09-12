@@ -138,6 +138,8 @@ export function App() {
     '--reader-font-size': `${readerSettings.fontSize}px`,
     '--reader-line-height': String(readerSettings.lineHeight),
     '--reader-font-family': readerFontStacks[readerSettings.fontFamily],
+    '--reader-max-width': ({ narrow: '620px', medium: '760px', wide: '900px' })[readerSettings.textWidth],
+    '--reader-text-align': readerSettings.textAlign,
   } as CSSProperties;
 
   const openBookPicker = useCallback(() => {

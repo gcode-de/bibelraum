@@ -1,4 +1,4 @@
-import { ALargeSmall, Check, Minus, Plus, RotateCcw, X } from 'lucide-react';
+import { ALargeSmall, AlignJustify, AlignLeft, Check, Minus, Plus, RotateCcw, X } from 'lucide-react';
 
 export type ReaderSettings = {
   fontSize: number;
@@ -6,6 +6,8 @@ export type ReaderSettings = {
   fontFamily: 'book' | 'classic' | 'sans';
   accent: 'terracotta' | 'blue' | 'green';
   highlight: 'yellow' | 'rose' | 'blue';
+  textWidth: 'narrow' | 'medium' | 'wide';
+  textAlign: 'left' | 'justify';
 };
 
 export type ReaderTheme = 'light' | 'sepia' | 'gray' | 'dark' | 'black';
@@ -16,6 +18,8 @@ export const defaultReaderSettings: ReaderSettings = {
   fontFamily: 'book',
   accent: 'terracotta',
   highlight: 'yellow',
+  textWidth: 'medium',
+  textAlign: 'left',
 };
 
 export const readerFontStacks: Record<ReaderSettings['fontFamily'], string> = {
@@ -54,6 +58,8 @@ export function loadReaderSettings(): ReaderSettings {
       fontFamily,
       accent: saved.accent === 'blue' || saved.accent === 'green' ? saved.accent : 'terracotta',
       highlight: saved.highlight === 'rose' || saved.highlight === 'blue' ? saved.highlight : 'yellow',
+      textWidth: saved.textWidth === 'narrow' || saved.textWidth === 'wide' ? saved.textWidth : 'medium',
+      textAlign: saved.textAlign === 'justify' ? 'justify' : 'left',
     };
   } catch {
     return defaultReaderSettings;
@@ -164,6 +170,28 @@ export function ReaderSettingsPanel({ settings, theme, onChange, onThemeChange, 
           >
             <Plus size={18} />
           </button>
+        </div>
+      </div>
+
+      <div className="settings-group reading-layout-settings">
+        <div>
+          <div className="settings-label"><span>Textbreite</span></div>
+          <div className="segmented-control three-options">
+            {([
+              ['narrow', 'Schmal'],
+              ['medium', 'Mittel'],
+              ['wide', 'Breit'],
+            ] as const).map(([value, label]) => (
+              <button className={settings.textWidth === value ? 'selected' : ''} onClick={() => update('textWidth', value)} key={value}>{label}</button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="settings-label"><span>Textausrichtung</span></div>
+          <div className="segmented-control">
+            <button className={settings.textAlign === 'left' ? 'selected' : ''} onClick={() => update('textAlign', 'left')}><AlignLeft size={15} /> Flattersatz</button>
+            <button className={settings.textAlign === 'justify' ? 'selected' : ''} onClick={() => update('textAlign', 'justify')}><AlignJustify size={15} /> Blocksatz</button>
+          </div>
         </div>
       </div>
 
