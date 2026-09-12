@@ -32,8 +32,18 @@ export type Passage = {
   translations: Array<{
     code: string;
     name: string;
-    verses: Array<{ verse: number; text: string }>;
+    verses: Array<{ verse: number; text: string; commentCount: number }>;
   }>;
+};
+
+export type StudyComment = {
+  id: number;
+  sourceTitle: string;
+  author: string;
+  copyright: string;
+  usageNotice: string;
+  text: string;
+  sourceUrl: string;
 };
 
 export type SearchResult = {

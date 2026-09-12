@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   ArrowRight,
+  BookMarked,
   BookOpenText,
   Check,
   ChevronDown,
@@ -10,7 +11,9 @@ import {
   Highlighter,
   Library,
   Link2,
+  LoaderCircle,
   Menu,
+  MessageSquareText,
   Moon,
   Plus,
   Search,
@@ -28,7 +31,7 @@ import {
   readerFontStacks,
 } from './ReaderSettings';
 import type { ReaderTheme } from './ReaderSettings';
-import type { Book, Passage, PassageLocation, SearchResult, Translation } from './types';
+import type { Book, Passage, PassageLocation, SearchResult, StudyComment, Translation } from './types';
 
 const DEFAULT_BOOK = 43;
 const DEFAULT_CHAPTER = 3;
@@ -737,27 +740,37 @@ export function App() {
                       )}
                       <div className="verses">
                         {translation.verses.map((item) => (
-                          <button
-                            type="button"
-                            id={index === 0 ? `vers-${item.verse}` : undefined}
-                            className={[
-                              'verse',
-                              highlightedVerse === item.verse ? 'is-highlighted' : '',
-                              selectedVerses.some((verse) => verse.verse === item.verse && verse.translationCode === translation.code) ? 'is-selected' : '',
-                              markedVerses.includes(`${translation.code}:${bookId}:${chapter}:${item.verse}`) ? 'is-marked' : '',
-                            ].filter(Boolean).join(' ')}
-                            onClick={() => setSelectedVerses((current) => {
-                              const exists = current.some((verse) => verse.verse === item.verse && verse.translationCode === translation.code);
-                              return exists
-                                ? current.filter((verse) => verse.verse !== item.verse || verse.translationCode !== translation.code)
-                                : [...current, { ...item, translationCode: translation.code }];
-                            })}
-                            aria-pressed={selectedVerses.some((verse) => verse.verse === item.verse && verse.translationCode === translation.code)}
-                            key={item.verse}
-                          >
-                            <sup>{item.verse}</sup>
-                            {item.text}
-                          </button>
+                          <div className={`verse-entry ${item.commentCount > 0 ? 'has-comments' : ''}`} key={item.verse}>
+                            <button
+                              type="button"
+                              id={index === 0 ? `vers-${item.verse}` : undefined}
+                              className={[
+                                'verse',
+                                highlightedVerse === item.verse ? 'is-highlighted' : '',
+                                selectedVerses.some((verse) => verse.verse === item.verse && verse.translationCode === translation.code) ? 'is-selected' : '',
+                                markedVerses.includes(`${translation.code}:${bookId}:${chapter}:${item.verse}`) ? 'is-marked' : '',
+                              ].filter(Boolean).join(' ')}
+                              onClick={() => setSelectedVerses((current) => {
+                                const exists = current.some((verse) => verse.verse === item.verse && verse.translationCode === translation.code);
+                                return exists
+                                  ? current.filter((verse) => verse.verse !== item.verse || verse.translationCode !== translation.code)
+                                  : [...current, { ...item, translationCode: translation.code }];
+                              })}
+                              aria-pressed={selectedVerses.some((verse) => verse.verse === item.verse && verse.translationCode === translation.code)}
+                            >
+                              <sup>{item.verse}</sup>
+                              {item.text}
+                            </button>
+                            {item.commentCount > 0 && (
+                              <StudyCommentMarker
+                                bookId={bookId}
+                                chapter={chapter}
+                                verse={item.verse}
+                                translationCode={translation.code}
+                                count={item.commentCount}
+                              />
+                            )}
+                          </div>
                         ))}
                       </div>
                     </article>
@@ -807,6 +820,87 @@ export function App() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function StudyCommentMarker({ bookId, chapter, verse, translationCode, count }: {
+  bookId: number;
+  chapter: number;
+  verse: number;
+  translationCode: string;
+  count: number;
+}) {
+  const [comments, setComments] = useState<StudyComment[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [pinned, setPinned] = useState(false);
+  const requestController = useRef<AbortController | null>(null);
+
+  useEffect(() => () => requestController.current?.abort(), []);
+
+  async function loadComments() {
+    if (comments || loading) return;
+    const controller = new AbortController();
+    requestController.current = controller;
+    setLoading(true);
+    setError('');
+    try {
+      setComments(await api.comments(bookId, chapter, verse, translationCode, controller.signal));
+    } catch (reason) {
+      if (reason instanceof Error && reason.name !== 'AbortError') {
+        setError(reason.message);
+      }
+    } finally {
+      if (!controller.signal.aborted) setLoading(false);
+    }
+  }
+
+  function togglePinned() {
+    void loadComments();
+    setPinned((current) => !current);
+  }
+
+  return (
+    <div
+      className={`study-comment-marker-wrap ${pinned ? 'is-pinned' : ''}`}
+      onPointerEnter={() => void loadComments()}
+      onFocus={() => void loadComments()}
+    >
+      {pinned && <button className="study-comment-scrim" onClick={() => setPinned(false)} aria-label="Kommentar schließen" />}
+      <button
+        className="study-comment-marker"
+        onClick={togglePinned}
+        aria-label={`${count} ${count === 1 ? 'Studienkommentar' : 'Studienkommentare'} zu Vers ${verse}`}
+        aria-expanded={pinned}
+      >
+        <MessageSquareText size={14} />
+        {count > 1 && <small>{count}</small>}
+      </button>
+      <aside className="study-comment-popover" aria-live="polite">
+        <header>
+          <span><BookMarked size={15} /> Studienkommentar zu Vers {verse}</span>
+          <button onClick={() => setPinned(false)} aria-label="Kommentar schließen"><X size={17} /></button>
+        </header>
+        {loading && <div className="comment-loading"><LoaderCircle size={18} /> Kommentar wird geladen …</div>}
+        {error && <p className="comment-error">{error}</p>}
+        {comments?.map((comment) => (
+          <article key={comment.id}>
+            <div className="comment-source">
+              <b>{comment.sourceTitle}</b>
+              {comment.author && <span>{comment.author}</span>}
+            </div>
+            <p>{comment.text}</p>
+            <details>
+              <summary>Quelle und Nutzungshinweise</summary>
+              {comment.copyright && <p>{comment.copyright}</p>}
+              {comment.usageNotice && <p>{comment.usageNotice}</p>}
+            </details>
+          </article>
+        ))}
+        {!loading && comments?.length === 0 && <p className="comment-error">Kein Kommentar verfügbar.</p>}
+        {!pinned && comments && <span className="comment-pin-hint">Antippen, um den Kommentar geöffnet zu halten</span>}
+      </aside>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import type { Book, Passage, SearchResult, Translation } from './types';
+import type { Book, Passage, SearchResult, StudyComment, Translation } from './types';
 
 async function request<T>(url: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, { signal });
@@ -16,6 +16,11 @@ export const api = {
   passage: (bookId: number, chapter: number, translations: string[], signal?: AbortSignal) =>
     request<Passage>(
       `/api/passage/${bookId}/${chapter}?translations=${encodeURIComponent(translations.join(','))}`,
+      signal,
+    ),
+  comments: (bookId: number, chapter: number, verse: number, translation: string, signal?: AbortSignal) =>
+    request<StudyComment[]>(
+      `/api/comments/${bookId}/${chapter}/${verse}?translation=${encodeURIComponent(translation)}`,
       signal,
     ),
   search: (query: string, translation: string, signal?: AbortSignal) =>
