@@ -34,16 +34,35 @@ const DEFAULT_BOOK = 43;
 const DEFAULT_CHAPTER = 3;
 const DEFAULT_TRANSLATION = 'LUT';
 
+type ReadingState = {
+  bookId: number;
+  chapter: number;
+  translation: string;
+  scrollY: number;
+};
+
+function loadReadingState(): Partial<ReadingState> {
+  try {
+    const saved = JSON.parse(localStorage.getItem('bibelraum.reading-state') ?? '{}');
+    return saved && typeof saved === 'object' ? saved as Partial<ReadingState> : {};
+  } catch {
+    return {};
+  }
+}
+
 function getInitialLocation() {
   const params = new URLSearchParams(window.location.search);
   const book = Number(params.get('buch'));
   const chapter = Number(params.get('kapitel'));
+  const saved = loadReadingState();
+  const hasUrlLocation = Number.isInteger(book) && book > 0;
   return {
-    bookId: Number.isInteger(book) && book > 0 ? book : DEFAULT_BOOK,
-    chapter: Number.isInteger(chapter) && chapter > 0 ? chapter : DEFAULT_CHAPTER,
+    bookId: hasUrlLocation ? book : Number(saved.bookId) || DEFAULT_BOOK,
+    chapter: Number.isInteger(chapter) && chapter > 0 ? chapter : Number(saved.chapter) || DEFAULT_CHAPTER,
     translation: params.get('uebersetzung')?.toUpperCase() ||
-      localStorage.getItem('bibelraum.translation') || DEFAULT_TRANSLATION,
+      saved.translation || localStorage.getItem('bibelraum.translation') || DEFAULT_TRANSLATION,
     verse: Number(params.get('vers')) || null,
+    scrollY: hasUrlLocation ? 0 : Math.max(0, Number(saved.scrollY) || 0),
   };
 }
 
@@ -125,9 +144,11 @@ export function App() {
   const [markedVerses, setMarkedVerses] = useState<string[]>(loadMarkedVerses);
   const [verseActionMessage, setVerseActionMessage] = useState('');
   const [readerChromeVisible, setReaderChromeVisible] = useState(true);
+  const [scrollProgress, setScrollProgress] = useState(0);
   const searchInput = useRef<HTMLInputElement>(null);
   const lastScrollY = useRef(window.scrollY);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const pendingScrollRestore = useRef(initial.scrollY);
 
   const primaryCode = selectedCodes[0];
   const currentBook = books.find((book) => book.id === bookId);
@@ -277,6 +298,49 @@ export function App() {
       uebersetzung: primaryCode,
     });
     window.history.replaceState(null, '', `?${params}`);
+  }, [bookId, chapter, primaryCode]);
+
+  useEffect(() => {
+    if (loading || !passage || pendingScrollRestore.current <= 0) return;
+    const scrollY = pendingScrollRestore.current;
+    pendingScrollRestore.current = 0;
+    const frame = window.requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'auto' }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [loading, passage]);
+
+  useEffect(() => {
+    let frame = 0;
+    let saveTimer = 0;
+
+    function persistPosition() {
+      localStorage.setItem('bibelraum.reading-state', JSON.stringify({
+        bookId,
+        chapter,
+        translation: primaryCode,
+        scrollY: Math.round(window.scrollY),
+      } satisfies ReadingState));
+    }
+
+    function onReadingScroll() {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+        setScrollProgress(scrollable > 0 ? Math.min(1, window.scrollY / scrollable) : 0);
+      });
+      window.clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(persistPosition, 180);
+    }
+
+    persistPosition();
+    onReadingScroll();
+    window.addEventListener('scroll', onReadingScroll, { passive: true });
+    window.addEventListener('beforeunload', persistPosition);
+    return () => {
+      window.removeEventListener('scroll', onReadingScroll);
+      window.removeEventListener('beforeunload', persistPosition);
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(saveTimer);
+    };
   }, [bookId, chapter, primaryCode]);
 
   useEffect(() => {
@@ -580,6 +644,7 @@ export function App() {
 
       <main className="reader" onTouchStart={startSwipe} onTouchEnd={finishSwipe}>
         <nav className="passage-nav" aria-label="Bibelstelle auswählen">
+          <span className="reading-position-progress" style={{ transform: `scaleX(${scrollProgress})` }} aria-hidden="true" />
           <button
             className="nav-arrow"
             onClick={() => goTo(passage?.previous ?? null)}

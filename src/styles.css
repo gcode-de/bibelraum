@@ -121,6 +121,7 @@ kbd { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; backg
 
 .reader { min-height: 100vh; margin-left: 286px; padding-top: 72px; }
 .passage-nav { position: sticky; top: 72px; z-index: 15; display: flex; align-items: center; justify-content: center; gap: 9px; height: 68px; border-bottom: 1px solid var(--line); background: var(--topbar); backdrop-filter: blur(18px); transition: transform .28s cubic-bezier(.22, .78, .28, 1), top .28s cubic-bezier(.22, .78, .28, 1); }
+.reading-position-progress { position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; background: var(--accent); transform-origin: left center; transition: transform .1s linear; }
 .app-shell.chrome-hidden .topbar { transform: translateY(-105%); }
 .app-shell.chrome-hidden .passage-nav { top: 0; }
 .nav-arrow { width: 34px; height: 34px; border: 0; }
