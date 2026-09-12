@@ -8,9 +8,11 @@ services:
     environment:
       PORT: 4174
       BIBLE_ARCHIVE: /app/input/bibles.zip
+      STUDY_ARCHIVE: /app/input/study-bible.zip
       BIBLE_DB: /app/data/bibelraum.sqlite
     volumes:
       - "${BIBLE_ARCHIVE_PATH:-/opt/bibelraum/OpenLP-Bibeln-DE-2026-09-07.zip}:/app/input/bibles.zip:ro"
+      - "${STUDY_ARCHIVE_PATH:-/opt/bibelraum/MacArthur-Studienbibel-SLT2000-OpenLP-2026-09-12.zip}:/app/input/study-bible.zip:ro"
       - bibelraum-data:/app/data
     read_only: true
     tmpfs:

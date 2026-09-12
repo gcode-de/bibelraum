@@ -16,6 +16,7 @@ gemeinsame, für die Web-App optimierte SQLite-Datenbank importiert.
 - responsive Oberfläche für Desktop, Tablet und Smartphone
 - optionaler Dark Mode, dessen Auswahl lokal gespeichert wird
 - anpassbare Schriftart, Schriftgröße und Zeilenhöhe mit lokaler Speicherung
+- optionale MacArthur-Studienkommentare zur Schlachter 2000, bei Hover oder Tipp
 - keine Cloud, kein Konto und keine Veränderung der Quelldateien
 
 ## Schnellstart
@@ -50,6 +51,7 @@ Archiv, Datenbank und Port können über Umgebungsvariablen gesetzt werden:
 
 ```bash
 BIBLE_ARCHIVE="/pfad/meine-bibeln.zip" \
+STUDY_ARCHIVE="/pfad/MacArthur-Studienbibel-SLT2000-OpenLP-2026-09-12.zip" \
 BIBLE_DB="/pfad/bibelraum.sqlite" \
 PORT=8080 \
 npm start
@@ -82,7 +84,9 @@ Ein Push auf `main`, ein Tag wie `v1.0.0` oder ein manueller Start unter
 ```bash
 sudo mkdir -p /opt/bibelraum
 sudo cp OpenLP-Bibeln-DE-2026-09-07.zip /opt/bibelraum/
+sudo cp MacArthur-Studienbibel-SLT2000-OpenLP-2026-09-12.zip /opt/bibelraum/
 sudo chmod 644 /opt/bibelraum/OpenLP-Bibeln-DE-2026-09-07.zip
+sudo chmod 644 /opt/bibelraum/MacArthur-Studienbibel-SLT2000-OpenLP-2026-09-12.zip
 ```
 
 ### 3. Stack in Portainer anlegen
@@ -98,6 +102,7 @@ Optional lassen sich Pfad, Port und Image-Tag anpassen:
 
 ```text
 BIBLE_ARCHIVE_PATH=/opt/bibelraum/OpenLP-Bibeln-DE-2026-09-07.zip
+STUDY_ARCHIVE_PATH=/opt/bibelraum/MacArthur-Studienbibel-SLT2000-OpenLP-2026-09-12.zip
 BIBELRAUM_PORT=4174
 BIBELRAUM_TAG=latest
 ```
@@ -153,3 +158,8 @@ npm run build
 Die Bibeltexte selbst werden nicht in diesem Git-Repository hinzugefügt. Für
 Nutzung und Weitergabe gelten die Rechte und Vereinbarungen der jeweiligen
 Herausgeber; siehe auch die Hinweise im Archiv.
+
+Das MacArthur-Paket wird ebenfalls nur lokal eingebunden und nicht in das Image
+oder Repository aufgenommen. Laut Pakethinweis ist es ausschließlich im Rahmen
+der vorhandenen Nutzungsrechte zu verwenden und darf nicht ohne ausdrückliche
+Genehmigung veröffentlicht oder weiterverbreitet werden.

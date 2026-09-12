@@ -9,8 +9,10 @@ ContainerName=bibelraum
 PublishPort=4174:4174
 Environment=PORT=4174
 Environment=BIBLE_ARCHIVE=/app/input/bibles.zip
+Environment=STUDY_ARCHIVE=/app/input/study-bible.zip
 Environment=BIBLE_DB=/app/data/bibelraum.sqlite
 Volume=/opt/bibelraum/bibles.zip:/app/input/bibles.zip:ro
+Volume=/opt/bibelraum/study-bible.zip:/app/input/study-bible.zip:ro
 Volume=bibelraum-data.volume:/app/data
 ReadOnly=true
 Tmpfs=/tmp:size=256m,mode=1777
