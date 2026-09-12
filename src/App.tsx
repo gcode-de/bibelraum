@@ -16,22 +16,25 @@ import {
   Menu,
   MessageSquareText,
   Moon,
+  Palette,
   Plus,
   Search,
   Share2,
   SlidersHorizontal,
   Sun,
+  Trash2,
   X,
 } from 'lucide-react';
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, TouchEvent as ReactTouchEvent } from 'react';
 import { api } from './api';
 import {
+  highlightChoices,
   loadReaderSettings,
   ReaderSettingsPanel,
   readerFontStacks,
 } from './ReaderSettings';
-import type { ReaderTheme } from './ReaderSettings';
+import type { HighlightColor, ReaderTheme } from './ReaderSettings';
 import type { Book, Passage, PassageLocation, SearchResult, StudyComment, Translation } from './types';
 
 const DEFAULT_BOOK = 43;
@@ -79,9 +82,21 @@ type SelectedVerse = {
 function loadMarkedVerses() {
   try {
     const saved = JSON.parse(localStorage.getItem('bibelraum.marked-verses') ?? '[]');
-    return Array.isArray(saved) ? saved.filter((item): item is string => typeof item === 'string') : [];
+    if (Array.isArray(saved)) {
+      return Object.fromEntries(
+        saved.filter((item): item is string => typeof item === 'string').map((key) => [key, 'yellow']),
+      ) as Record<string, HighlightColor>;
+    }
+    if (saved && typeof saved === 'object') {
+      return Object.fromEntries(
+        Object.entries(saved).filter((entry): entry is [string, HighlightColor] =>
+          typeof entry[0] === 'string' &&
+          highlightChoices.some((choice) => choice.id === entry[1])),
+      );
+    }
+    return {};
   } catch {
-    return [];
+    return {};
   }
 }
 
@@ -150,8 +165,9 @@ export function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [highlightedVerse, setHighlightedVerse] = useState<number | null>(initial.verse);
   const [selectedVerses, setSelectedVerses] = useState<SelectedVerse[]>([]);
-  const [markedVerses, setMarkedVerses] = useState<string[]>(loadMarkedVerses);
+  const [markedVerses, setMarkedVerses] = useState<Record<string, HighlightColor>>(loadMarkedVerses);
   const [verseActionMessage, setVerseActionMessage] = useState('');
+  const [verseColorMenuOpen, setVerseColorMenuOpen] = useState(false);
   const [readerChromeVisible, setReaderChromeVisible] = useState(true);
   const [scrollProgress, setScrollProgress] = useState(0);
   const searchInput = useRef<HTMLInputElement>(null);
@@ -165,7 +181,8 @@ export function App() {
     (verse) => `${verse.translationCode}:${bookId}:${chapter}:${verse.verse}`,
   );
   const allSelectedVersesMarked = selectedVerseKeys.length > 0 &&
-    selectedVerseKeys.every((key) => markedVerses.includes(key));
+    selectedVerseKeys.every((key) => Boolean(markedVerses[key]));
+  const someSelectedVersesMarked = selectedVerseKeys.some((key) => Boolean(markedVerses[key]));
   const readerStyle = {
     '--reader-font-size': `${readerSettings.fontSize}px`,
     '--reader-line-height': String(readerSettings.lineHeight),
@@ -274,6 +291,10 @@ export function App() {
   useEffect(() => {
     localStorage.setItem('bibelraum.marked-verses', JSON.stringify(markedVerses));
   }, [markedVerses]);
+
+  useEffect(() => {
+    if (selectedVerses.length === 0) setVerseColorMenuOpen(false);
+  }, [selectedVerses.length]);
 
   useEffect(() => {
     localStorage.setItem('bibelraum.recent-translations', JSON.stringify(recentTranslations));
@@ -490,9 +511,26 @@ export function App() {
   }
 
   async function copyText(value: string, message: string) {
-    await navigator.clipboard.writeText(value);
-    setVerseActionMessage(message);
-    window.setTimeout(() => setVerseActionMessage(''), 1800);
+    try {
+      if (window.isSecureContext && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = value;
+        textArea.setAttribute('readonly', '');
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.append(textArea);
+        textArea.select();
+        const copied = document.execCommand('copy');
+        textArea.remove();
+        if (!copied) throw new Error('copy failed');
+      }
+      setVerseActionMessage(message);
+    } catch {
+      setVerseActionMessage('Kopieren wurde vom Browser blockiert');
+    }
+    window.setTimeout(() => setVerseActionMessage(''), 2200);
   }
 
   async function shareVerse() {
@@ -500,18 +538,50 @@ export function App() {
     const text = selectedVerseText();
     const url = new URL(window.location.href);
     url.searchParams.set('vers', [...new Set(selectedVerses.map((verse) => verse.verse))].sort((a, b) => a - b).join(','));
-    if (navigator.share) {
-      await navigator.share({ title: selectionLabel(), text, url: url.toString() });
-    } else {
+    if (!navigator.share) {
       await copyText(`${text}\n${url}`, `${selectedVerses.length === 1 ? 'Vers' : 'Verse'} und Link kopiert`);
+      return;
+    }
+    try {
+      await navigator.share({ title: selectionLabel(), text, url: url.toString() });
+      setVerseActionMessage('Teilen geöffnet');
+    } catch (reason) {
+      if (!(reason instanceof DOMException && reason.name === 'AbortError')) {
+        await copyText(`${text}\n${url}`, 'Teilen nicht verfügbar – Inhalt kopiert');
+      }
     }
   }
 
   function toggleVerseMark() {
     if (selectedVerseKeys.length === 0) return;
-    setMarkedVerses((current) => allSelectedVersesMarked
-      ? current.filter((key) => !selectedVerseKeys.includes(key))
-      : [...new Set([...current, ...selectedVerseKeys])]);
+    if (allSelectedVersesMarked) {
+      removeVerseMarks();
+      return;
+    }
+    applyVerseColor(readerSettings.highlight);
+  }
+
+  function applyVerseColor(color: HighlightColor) {
+    setMarkedVerses((current) => {
+      const next = { ...current };
+      selectedVerseKeys.forEach((key) => { next[key] = color; });
+      return next;
+    });
+    setReaderSettings((current) => ({ ...current, highlight: color }));
+    setVerseColorMenuOpen(false);
+    setVerseActionMessage(`${selectedVerseKeys.length === 1 ? 'Vers' : 'Verse'} ${highlightChoices.find((choice) => choice.id === color)?.name.toLowerCase()} markiert`);
+    window.setTimeout(() => setVerseActionMessage(''), 1800);
+  }
+
+  function removeVerseMarks() {
+    setMarkedVerses((current) => {
+      const next = { ...current };
+      selectedVerseKeys.forEach((key) => { delete next[key]; });
+      return next;
+    });
+    setVerseColorMenuOpen(false);
+    setVerseActionMessage('Markierung entfernt');
+    window.setTimeout(() => setVerseActionMessage(''), 1800);
   }
 
   function startSwipe(event: ReactTouchEvent<HTMLElement>) {
@@ -768,8 +838,11 @@ export function App() {
                                 'verse',
                                 highlightedVerse === item.verse ? 'is-highlighted' : '',
                                 selectedVerses.some((verse) => verse.verse === item.verse && verse.translationCode === translation.code) ? 'is-selected' : '',
-                                markedVerses.includes(`${translation.code}:${bookId}:${chapter}:${item.verse}`) ? 'is-marked' : '',
+                                markedVerses[`${translation.code}:${bookId}:${chapter}:${item.verse}`] ? 'is-marked' : '',
                               ].filter(Boolean).join(' ')}
+                              style={markedVerses[`${translation.code}:${bookId}:${chapter}:${item.verse}`]
+                                ? { '--verse-highlight': `var(--highlight-${markedVerses[`${translation.code}:${bookId}:${chapter}:${item.verse}`]})` } as CSSProperties
+                                : undefined}
                               onClick={() => setSelectedVerses((current) => {
                                 const exists = current.some((verse) => verse.verse === item.verse && verse.translationCode === translation.code);
                                 return exists
@@ -815,27 +888,52 @@ export function App() {
 
       {selectedVerses.length > 0 && (
         <div className="verse-actions" role="toolbar" aria-label={`Aktionen für ${selectionLabel()}`}>
+          {verseColorMenuOpen && (
+            <div className="verse-color-menu" role="dialog" aria-label="Markierungsfarbe auswählen">
+              <div>
+                <span><Palette size={15} /> Markierungsfarbe</span>
+                <button onClick={() => setVerseColorMenuOpen(false)} aria-label="Farbauswahl schließen"><X size={16} /></button>
+              </div>
+              <p>Die gewählte Farbe wird zugleich Standard für neue Markierungen.</p>
+              <div className="verse-color-grid">
+                {highlightChoices.map((color) => (
+                  <button onClick={() => applyVerseColor(color.id)} key={color.id}>
+                    <i className={color.id} />
+                    <span>{color.name}</span>
+                    {readerSettings.highlight === color.id && <Check size={13} />}
+                  </button>
+                ))}
+              </div>
+              {someSelectedVersesMarked && (
+                <button className="remove-verse-mark" onClick={removeVerseMarks}><Trash2 size={14} /> Markierung entfernen</button>
+              )}
+            </div>
+          )}
           <div className="verse-actions-reference">
             <b>{selectionLabel()}</b>
-            <span>{verseActionMessage || `${selectedVerses.length} ${selectedVerses.length === 1 ? 'Vers' : 'Verse'} ausgewählt`}</span>
+            <span role="status">{verseActionMessage || `${selectedVerses.length} ${selectedVerses.length === 1 ? 'Vers' : 'Verse'} ausgewählt`}</span>
           </div>
-          <button onClick={() => copyText(selectedVerseText(), `${selectedVerses.length === 1 ? 'Vers' : `${selectedVerses.length} Verse`} kopiert`)}>
+          {verseActionMessage && <span className="verse-action-toast" role="status">{verseActionMessage}</span>}
+          <button onClick={() => void copyText(selectedVerseText(), `${selectedVerses.length === 1 ? 'Vers' : `${selectedVerses.length} Verse`} kopiert`)}>
             <Copy size={18} /><span>Kopieren</span>
           </button>
-          <button onClick={shareVerse}>
+          <button onClick={() => void shareVerse()}>
             <Share2 size={18} /><span>Teilen</span>
           </button>
           <button onClick={() => {
             const url = new URL(window.location.href);
             url.searchParams.set('vers', [...new Set(selectedVerses.map((verse) => verse.verse))].sort((a, b) => a - b).join(','));
-            copyText(url.toString(), 'Link kopiert');
+            void copyText(url.toString(), 'Link kopiert');
           }}>
             <Link2 size={18} /><span>Link</span>
           </button>
           <button className={allSelectedVersesMarked ? 'active' : ''} onClick={toggleVerseMark}>
             <Highlighter size={18} /><span>Markieren</span>
           </button>
-          <button className="verse-actions-close" onClick={() => setSelectedVerses([])} aria-label="Versauswahl schließen">
+          <button className={verseColorMenuOpen ? 'active' : ''} onClick={() => setVerseColorMenuOpen((open) => !open)}>
+            <Palette size={18} /><span>Farbe</span>
+          </button>
+          <button className="verse-actions-close" onClick={() => { setVerseColorMenuOpen(false); setSelectedVerses([]); }} aria-label="Versauswahl schließen">
             <X size={19} />
           </button>
         </div>

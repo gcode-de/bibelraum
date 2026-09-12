@@ -5,10 +5,21 @@ export type ReaderSettings = {
   lineHeight: number;
   fontFamily: 'book' | 'classic' | 'sans';
   accent: 'terracotta' | 'blue' | 'green';
-  highlight: 'yellow' | 'rose' | 'blue';
+  highlight: HighlightColor;
   textWidth: 'narrow' | 'medium' | 'wide';
   textAlign: 'left' | 'justify';
 };
+
+export type HighlightColor = 'yellow' | 'orange' | 'rose' | 'purple' | 'blue' | 'green';
+
+export const highlightChoices: Array<{ id: HighlightColor; name: string }> = [
+  { id: 'yellow', name: 'Gelb' },
+  { id: 'orange', name: 'Orange' },
+  { id: 'rose', name: 'Rosa' },
+  { id: 'purple', name: 'Violett' },
+  { id: 'blue', name: 'Blau' },
+  { id: 'green', name: 'Grün' },
+];
 
 export type ReaderTheme = 'light' | 'sepia' | 'gray' | 'dark' | 'black';
 
@@ -57,7 +68,9 @@ export function loadReaderSettings(): ReaderSettings {
       lineHeight: clamp(Number(saved.lineHeight) || defaultReaderSettings.lineHeight, 1.35, 2.1),
       fontFamily,
       accent: saved.accent === 'blue' || saved.accent === 'green' ? saved.accent : 'terracotta',
-      highlight: saved.highlight === 'rose' || saved.highlight === 'blue' ? saved.highlight : 'yellow',
+      highlight: highlightChoices.some((choice) => choice.id === saved.highlight)
+        ? saved.highlight as HighlightColor
+        : 'yellow',
       textWidth: saved.textWidth === 'narrow' || saved.textWidth === 'wide' ? saved.textWidth : 'medium',
       textAlign: saved.textAlign === 'justify' ? 'justify' : 'left',
     };
@@ -134,8 +147,8 @@ export function ReaderSettingsPanel({ settings, theme, onChange, onThemeChange, 
         <div>
           <span>Markierungen</span>
           <div className="color-choices highlight-choices">
-            {(['yellow', 'rose', 'blue'] as const).map((color) => (
-              <button className={`${color} ${settings.highlight === color ? 'selected' : ''}`} onClick={() => update('highlight', color)} aria-label={`Markierung ${color}`} aria-pressed={settings.highlight === color} key={color} />
+            {highlightChoices.map((color) => (
+              <button className={`${color.id} ${settings.highlight === color.id ? 'selected' : ''}`} onClick={() => update('highlight', color.id)} aria-label={`${color.name} als Standardfarbe`} aria-pressed={settings.highlight === color.id} title={color.name} key={color.id} />
             ))}
           </div>
         </div>
