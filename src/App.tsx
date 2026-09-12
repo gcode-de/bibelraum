@@ -52,6 +52,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>(getInitialTheme);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileExpandedBookId, setMobileExpandedBookId] = useState(initial.bookId);
   const [translationOpen, setTranslationOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -62,6 +63,12 @@ export function App() {
 
   const primaryCode = selectedCodes[0];
   const currentBook = books.find((book) => book.id === bookId);
+
+  const openBookPicker = useCallback(() => {
+    setSearchOpen(false);
+    setMobileExpandedBookId(bookId);
+    setSidebarOpen(true);
+  }, [bookId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -138,6 +145,22 @@ export function App() {
     return () => window.clearTimeout(timeout);
   }, [highlightedVerse, loading, passage]);
 
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const timeout = window.setTimeout(() => {
+      document.getElementById(`mobile-book-${bookId}`)?.scrollIntoView({
+        block: 'center',
+        behavior: 'smooth',
+      });
+    }, 180);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.clearTimeout(timeout);
+    };
+  }, [sidebarOpen]);
+
   const goTo = useCallback((location: PassageLocation | null) => {
     if (!location) return;
     setBookId(location.bookId);
@@ -164,6 +187,15 @@ export function App() {
   function chooseBook(nextBookId: number) {
     setBookId(nextBookId);
     setChapter(1);
+    setSidebarOpen(false);
+    setSearchOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function chooseChapter(nextBookId: number, nextChapter: number) {
+    setBookId(nextBookId);
+    setChapter(nextChapter);
+    setMobileExpandedBookId(nextBookId);
     setSidebarOpen(false);
     setSearchOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -209,7 +241,7 @@ export function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <button className="icon-button mobile-only" onClick={() => setSidebarOpen(true)} aria-label="Bücher öffnen">
+        <button className="icon-button mobile-only" onClick={openBookPicker} aria-label="Bücher öffnen">
           <Menu size={20} />
         </button>
         <a className="brand" href="/" aria-label="Bibelraum Startseite">
@@ -251,15 +283,17 @@ export function App() {
         )}
       </header>
 
-      <aside className={`sidebar ${sidebarOpen ? 'is-open' : ''}`}>
+      <aside className={`sidebar ${sidebarOpen ? 'is-open' : ''}`} aria-label="Buch- und Kapitelauswahl">
         <div className="sidebar-heading">
-          <div>
+          <button className="mobile-close mobile-only" onClick={() => setSidebarOpen(false)} aria-label="Schließen">
+            <X size={25} />
+          </button>
+          <div className="desktop-only">
             <span className="eyebrow">Bibliothek</span>
             <h2>66 Bücher</h2>
           </div>
-          <button className="icon-button mobile-only" onClick={() => setSidebarOpen(false)} aria-label="Schließen">
-            <X size={20} />
-          </button>
+          <h2 className="mobile-picker-title mobile-only">Bücher & Kapitel</h2>
+          <span className="mobile-heading-spacer mobile-only" aria-hidden="true" />
         </div>
         <form className="search-box" onSubmit={submitSearch}>
           <Search size={17} aria-hidden="true" />
@@ -282,7 +316,21 @@ export function App() {
             onSelect={openSearchResult}
           />
         ) : (
-          <BookLibrary books={books} currentBookId={bookId} onSelect={chooseBook} />
+          <>
+            <div className="desktop-book-library">
+              <BookLibrary books={books} currentBookId={bookId} onSelect={chooseBook} />
+            </div>
+            <div className="mobile-book-library">
+              <MobileBookPicker
+                books={books}
+                currentBookId={bookId}
+                currentChapter={chapter}
+                expandedBookId={mobileExpandedBookId}
+                onExpand={setMobileExpandedBookId}
+                onSelectChapter={chooseChapter}
+              />
+            </div>
+          </>
         )}
         <div className="sidebar-note">
           <Library size={15} />
@@ -301,6 +349,10 @@ export function App() {
             aria-label="Vorheriges Kapitel"
           >
             <ArrowLeft size={18} />
+          </button>
+          <button className="mobile-passage-trigger mobile-only" onClick={openBookPicker}>
+            <span>{currentBook?.name ?? passage?.book.name ?? 'Buch'} {chapter}</span>
+            <ChevronDown size={16} />
           </button>
           <label className="select-control book-select">
             <span>Buch</span>
@@ -394,6 +446,65 @@ export function App() {
           )}
         </div>
       </main>
+    </div>
+  );
+}
+
+function MobileBookPicker({
+  books,
+  currentBookId,
+  currentChapter,
+  expandedBookId,
+  onExpand,
+  onSelectChapter,
+}: {
+  books: Book[];
+  currentBookId: number;
+  currentChapter: number;
+  expandedBookId: number;
+  onExpand: (bookId: number) => void;
+  onSelectChapter: (bookId: number, chapter: number) => void;
+}) {
+  return (
+    <div className="mobile-book-picker">
+      {([1, 2] as const).map((testament) => (
+        <section key={testament}>
+          <h3>{testament === 1 ? 'Altes Testament' : 'Neues Testament'}</h3>
+          {books.filter((book) => book.testament === testament).map((book) => {
+            const isExpanded = book.id === expandedBookId;
+            return (
+              <div className={`mobile-book-row ${isExpanded ? 'is-expanded' : ''}`} id={`mobile-book-${book.id}`} key={book.id}>
+                <button
+                  className={book.id === currentBookId ? 'current' : ''}
+                  onClick={() => onExpand(book.id)}
+                  aria-expanded={isExpanded}
+                >
+                  <span>{book.name}</span>
+                  <small>{book.chapters} Kapitel</small>
+                </button>
+                {isExpanded && (
+                  <div className="mobile-chapter-grid" aria-label={`Kapitel in ${book.name}`}>
+                    {Array.from({ length: book.chapters }, (_, index) => {
+                      const number = index + 1;
+                      const isCurrent = book.id === currentBookId && number === currentChapter;
+                      return (
+                        <button
+                          className={isCurrent ? 'current' : ''}
+                          onClick={() => onSelectChapter(book.id, number)}
+                          aria-current={isCurrent ? 'page' : undefined}
+                          key={number}
+                        >
+                          {number}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </section>
+      ))}
     </div>
   );
 }
