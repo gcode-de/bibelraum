@@ -15,6 +15,7 @@ gemeinsame, für die Web-App optimierte SQLite-Datenbank importiert.
 - direkte, kopierbare Stellen-URLs
 - responsive Oberfläche für Desktop, Tablet und Smartphone
 - optionaler Dark Mode, dessen Auswahl lokal gespeichert wird
+- anpassbare Schriftart, Schriftgröße und Zeilenhöhe mit lokaler Speicherung
 - keine Cloud, kein Konto und keine Veränderung der Quelldateien
 
 ## Schnellstart

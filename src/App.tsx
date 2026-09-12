@@ -11,11 +11,18 @@ import {
   Moon,
   Plus,
   Search,
+  SlidersHorizontal,
   Sun,
   X,
 } from 'lucide-react';
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { api } from './api';
+import {
+  loadReaderSettings,
+  ReaderSettingsPanel,
+  readerFontStacks,
+} from './ReaderSettings';
 import type { Book, Passage, PassageLocation, SearchResult, Translation } from './types';
 
 const DEFAULT_BOOK = 43;
@@ -54,6 +61,8 @@ export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileExpandedBookId, setMobileExpandedBookId] = useState(initial.bookId);
   const [translationOpen, setTranslationOpen] = useState(false);
+  const [readerSettingsOpen, setReaderSettingsOpen] = useState(false);
+  const [readerSettings, setReaderSettings] = useState(loadReaderSettings);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -63,6 +72,11 @@ export function App() {
 
   const primaryCode = selectedCodes[0];
   const currentBook = books.find((book) => book.id === bookId);
+  const readerStyle = {
+    '--reader-font-size': `${readerSettings.fontSize}px`,
+    '--reader-line-height': String(readerSettings.lineHeight),
+    '--reader-font-family': readerFontStacks[readerSettings.fontFamily],
+  } as CSSProperties;
 
   const openBookPicker = useCallback(() => {
     setSearchOpen(false);
@@ -126,6 +140,19 @@ export function App() {
       theme === 'dark' ? '#171816' : '#f4f0e7',
     );
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem('bibelraum.reader-settings', JSON.stringify(readerSettings));
+  }, [readerSettings]);
+
+  useEffect(() => {
+    if (!readerSettingsOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [readerSettingsOpen]);
 
   useEffect(() => {
     localStorage.setItem('bibelraum.translation', primaryCode);
@@ -239,7 +266,7 @@ export function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" style={readerStyle}>
       <header className="topbar">
         <button className="icon-button mobile-only" onClick={openBookPicker} aria-label="Bücher öffnen">
           <Menu size={20} />
@@ -270,6 +297,16 @@ export function App() {
           >
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </button>
+          <button
+            className="icon-button"
+            onClick={() => {
+              setTranslationOpen(false);
+              setReaderSettingsOpen(true);
+            }}
+            aria-label="Leseansicht anpassen"
+          >
+            <SlidersHorizontal size={18} />
+          </button>
         </div>
 
         {translationOpen && (
@@ -282,6 +319,17 @@ export function App() {
           />
         )}
       </header>
+
+      {readerSettingsOpen && (
+        <>
+          <button className="settings-scrim" onClick={() => setReaderSettingsOpen(false)} aria-label="Leseansicht schließen" />
+          <ReaderSettingsPanel
+            settings={readerSettings}
+            onChange={setReaderSettings}
+            onClose={() => setReaderSettingsOpen(false)}
+          />
+        </>
+      )}
 
       <aside className={`sidebar ${sidebarOpen ? 'is-open' : ''}`} aria-label="Buch- und Kapitelauswahl">
         <div className="sidebar-heading">
