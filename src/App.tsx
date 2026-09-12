@@ -61,6 +61,16 @@ function loadMarkedVerses() {
   }
 }
 
+function loadRecentTranslations(initialCode: string) {
+  try {
+    const saved = JSON.parse(localStorage.getItem('bibelraum.recent-translations') ?? '[]');
+    const codes = Array.isArray(saved) ? saved.filter((item): item is string => typeof item === 'string') : [];
+    return [initialCode, ...codes.filter((code) => code !== initialCode)].slice(0, 4);
+  } catch {
+    return [initialCode];
+  }
+}
+
 function getInitialTheme() {
   const saved = localStorage.getItem('bibelraum.theme');
   if (saved === 'dark' || saved === 'light') return saved;
@@ -71,6 +81,7 @@ export function App() {
   const initial = useMemo(getInitialLocation, []);
   const [translations, setTranslations] = useState<Translation[]>([]);
   const [selectedCodes, setSelectedCodes] = useState<string[]>([initial.translation]);
+  const [recentTranslations, setRecentTranslations] = useState(() => loadRecentTranslations(initial.translation));
   const [books, setBooks] = useState<Book[]>([]);
   const [bookId, setBookId] = useState(initial.bookId);
   const [chapter, setChapter] = useState(initial.chapter);
@@ -203,6 +214,10 @@ export function App() {
   }, [markedVerses]);
 
   useEffect(() => {
+    localStorage.setItem('bibelraum.recent-translations', JSON.stringify(recentTranslations));
+  }, [recentTranslations]);
+
+  useEffect(() => {
     if (!readerSettingsOpen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -290,6 +305,7 @@ export function App() {
 
   function choosePrimary(code: string) {
     setSelectedCodes((current) => [code, ...current.filter((item) => item !== code)].slice(0, 3));
+    setRecentTranslations((current) => [code, ...current.filter((item) => item !== code)].slice(0, 4));
     setTranslationOpen(false);
   }
 
@@ -386,7 +402,11 @@ export function App() {
         <div className="topbar-actions">
           <button
             className="translation-trigger"
-            onClick={() => setTranslationOpen((open) => !open)}
+            onClick={() => {
+              setSidebarOpen(false);
+              setReaderSettingsOpen(false);
+              setTranslationOpen((open) => !open);
+            }}
             aria-expanded={translationOpen}
           >
             <span className="translation-code">{primaryCode}</span>
@@ -416,13 +436,17 @@ export function App() {
         </div>
 
         {translationOpen && (
-          <TranslationMenu
-            translations={translations}
-            selectedCodes={selectedCodes}
-            onChoosePrimary={choosePrimary}
-            onToggleComparison={toggleComparison}
-            onClose={() => setTranslationOpen(false)}
-          />
+          <>
+            <button className="translation-scrim" onClick={() => setTranslationOpen(false)} aria-label="Übersetzungsauswahl schließen" />
+            <TranslationMenu
+              translations={translations}
+              selectedCodes={selectedCodes}
+              recentCodes={recentTranslations}
+              onChoosePrimary={choosePrimary}
+              onToggleComparison={toggleComparison}
+              onClose={() => setTranslationOpen(false)}
+            />
+          </>
         )}
       </header>
 
@@ -731,20 +755,42 @@ function BookLibrary({ books, currentBookId, onSelect }: {
   );
 }
 
-function TranslationMenu({ translations, selectedCodes, onChoosePrimary, onToggleComparison, onClose }: {
+function TranslationMenu({ translations, selectedCodes, recentCodes, onChoosePrimary, onToggleComparison, onClose }: {
   translations: Translation[];
   selectedCodes: string[];
+  recentCodes: string[];
   onChoosePrimary: (code: string) => void;
   onToggleComparison: (code: string) => void;
   onClose: () => void;
 }) {
+  const recent = recentCodes
+    .map((code) => translations.find((translation) => translation.code === code))
+    .filter((translation): translation is Translation => Boolean(translation));
+
   return (
-    <div className="translation-menu">
+    <div className="translation-menu" role="dialog" aria-modal="true" aria-labelledby="translation-menu-title">
+      <div className="translation-handle" aria-hidden="true" />
       <div className="menu-heading">
-        <div><span className="eyebrow">Ausgabe wählen</span><h2>Übersetzungen</h2></div>
+        <div><span className="eyebrow">Ausgabe wählen</span><h2 id="translation-menu-title">Übersetzungen</h2></div>
         <button className="icon-button" onClick={onClose} aria-label="Schließen"><X size={18} /></button>
       </div>
       <p>Wähle deinen Haupttext oder vergleiche bis zu drei Ausgaben parallel.</p>
+      {recent.length > 1 && (
+        <div className="recent-translations">
+          <span>Zuletzt verwendet</span>
+          <div>
+            {recent.map((translation) => (
+              <button
+                className={selectedCodes[0] === translation.code ? 'active' : ''}
+                onClick={() => onChoosePrimary(translation.code)}
+                key={translation.code}
+              >
+                {translation.code}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="translation-list">
         {translations.map((translation) => {
           const isPrimary = selectedCodes[0] === translation.code;
