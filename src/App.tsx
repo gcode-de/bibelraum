@@ -27,6 +27,7 @@ import {
   ReaderSettingsPanel,
   readerFontStacks,
 } from './ReaderSettings';
+import type { ReaderTheme } from './ReaderSettings';
 import type { Book, Passage, PassageLocation, SearchResult, Translation } from './types';
 
 const DEFAULT_BOOK = 43;
@@ -91,7 +92,7 @@ function loadBookProgress() {
 
 function getInitialTheme() {
   const saved = localStorage.getItem('bibelraum.theme');
-  if (saved === 'dark' || saved === 'light') return saved;
+  if (saved === 'dark' || saved === 'light' || saved === 'sepia' || saved === 'gray' || saved === 'black') return saved;
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
@@ -106,7 +107,7 @@ export function App() {
   const [passage, setPassage] = useState<Passage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [theme, setTheme] = useState<'light' | 'dark'>(getInitialTheme);
+  const [theme, setTheme] = useState<ReaderTheme>(getInitialTheme);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileExpandedBookId, setMobileExpandedBookId] = useState(initial.bookId);
   const [bookFilter, setBookFilter] = useState('');
@@ -223,9 +224,14 @@ export function App() {
     localStorage.setItem('bibelraum.theme', theme);
     document.querySelector('meta[name="theme-color"]')?.setAttribute(
       'content',
-      theme === 'dark' ? '#171816' : '#f4f0e7',
+      ({ light: '#f4f0e7', sepia: '#eee3ce', gray: '#e8e8e5', dark: '#171816', black: '#000000' })[theme],
     );
   }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.dataset.accent = readerSettings.accent;
+    document.documentElement.dataset.highlight = readerSettings.highlight;
+  }, [readerSettings.accent, readerSettings.highlight]);
 
   useEffect(() => {
     localStorage.setItem('bibelraum.reader-settings', JSON.stringify(readerSettings));
@@ -453,10 +459,10 @@ export function App() {
           </button>
           <button
             className="icon-button"
-            onClick={() => setTheme((value) => value === 'light' ? 'dark' : 'light')}
-            aria-label={theme === 'light' ? 'Dunkelmodus aktivieren' : 'Hellmodus aktivieren'}
+            onClick={() => setTheme((value) => value === 'dark' || value === 'black' ? 'light' : 'dark')}
+            aria-label={theme === 'dark' || theme === 'black' ? 'Hellmodus aktivieren' : 'Dunkelmodus aktivieren'}
           >
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            {theme === 'dark' || theme === 'black' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
           <button
             className="icon-button"
@@ -490,7 +496,9 @@ export function App() {
           <button className="settings-scrim" onClick={() => setReaderSettingsOpen(false)} aria-label="Leseansicht schließen" />
           <ReaderSettingsPanel
             settings={readerSettings}
+            theme={theme}
             onChange={setReaderSettings}
+            onThemeChange={setTheme}
             onClose={() => setReaderSettingsOpen(false)}
           />
         </>

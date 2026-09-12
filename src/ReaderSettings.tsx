@@ -4,12 +4,18 @@ export type ReaderSettings = {
   fontSize: number;
   lineHeight: number;
   fontFamily: 'book' | 'classic' | 'sans';
+  accent: 'terracotta' | 'blue' | 'green';
+  highlight: 'yellow' | 'rose' | 'blue';
 };
+
+export type ReaderTheme = 'light' | 'sepia' | 'gray' | 'dark' | 'black';
 
 export const defaultReaderSettings: ReaderSettings = {
   fontSize: 20,
   lineHeight: 1.73,
   fontFamily: 'book',
+  accent: 'terracotta',
+  highlight: 'yellow',
 };
 
 export const readerFontStacks: Record<ReaderSettings['fontFamily'], string> = {
@@ -28,6 +34,14 @@ const fontChoices: Array<{
   { id: 'sans', name: 'Serifenlos', sample: 'Am Anfang' },
 ];
 
+const themeChoices: Array<{ id: ReaderTheme; name: string }> = [
+  { id: 'light', name: 'Hell' },
+  { id: 'sepia', name: 'Sepia' },
+  { id: 'gray', name: 'Grau' },
+  { id: 'dark', name: 'Nacht' },
+  { id: 'black', name: 'OLED' },
+];
+
 export function loadReaderSettings(): ReaderSettings {
   try {
     const saved = JSON.parse(localStorage.getItem('bibelraum.reader-settings') ?? '{}') as Partial<ReaderSettings>;
@@ -38,6 +52,8 @@ export function loadReaderSettings(): ReaderSettings {
       fontSize: clamp(Number(saved.fontSize) || defaultReaderSettings.fontSize, 16, 30),
       lineHeight: clamp(Number(saved.lineHeight) || defaultReaderSettings.lineHeight, 1.35, 2.1),
       fontFamily,
+      accent: saved.accent === 'blue' || saved.accent === 'green' ? saved.accent : 'terracotta',
+      highlight: saved.highlight === 'rose' || saved.highlight === 'blue' ? saved.highlight : 'yellow',
     };
   } catch {
     return defaultReaderSettings;
@@ -48,9 +64,11 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
-export function ReaderSettingsPanel({ settings, onChange, onClose }: {
+export function ReaderSettingsPanel({ settings, theme, onChange, onThemeChange, onClose }: {
   settings: ReaderSettings;
+  theme: ReaderTheme;
   onChange: (settings: ReaderSettings) => void;
+  onThemeChange: (theme: ReaderTheme) => void;
   onClose: () => void;
 }) {
   function update<Key extends keyof ReaderSettings>(key: Key, value: ReaderSettings[Key]) {
@@ -79,6 +97,42 @@ export function ReaderSettingsPanel({ settings, onChange, onClose }: {
         }}
       >
         <sup>16</sup> Denn also hat Gott die Welt geliebt.
+      </div>
+
+      <div className="settings-group appearance-group">
+        <div className="settings-label"><span>Farbprofil</span></div>
+        <div className="theme-choices">
+          {themeChoices.map((choice) => (
+            <button
+              className={`${choice.id} ${theme === choice.id ? 'selected' : ''}`}
+              onClick={() => onThemeChange(choice.id)}
+              aria-pressed={theme === choice.id}
+              key={choice.id}
+            >
+              <i><span /></i>
+              <small>{choice.name}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="settings-group color-settings">
+        <div>
+          <span>Akzentfarbe</span>
+          <div className="color-choices">
+            {(['terracotta', 'blue', 'green'] as const).map((color) => (
+              <button className={`${color} ${settings.accent === color ? 'selected' : ''}`} onClick={() => update('accent', color)} aria-label={`Akzent ${color}`} aria-pressed={settings.accent === color} key={color} />
+            ))}
+          </div>
+        </div>
+        <div>
+          <span>Markierungen</span>
+          <div className="color-choices highlight-choices">
+            {(['yellow', 'rose', 'blue'] as const).map((color) => (
+              <button className={`${color} ${settings.highlight === color ? 'selected' : ''}`} onClick={() => update('highlight', color)} aria-label={`Markierung ${color}`} aria-pressed={settings.highlight === color} key={color} />
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="settings-group">
@@ -148,7 +202,7 @@ export function ReaderSettingsPanel({ settings, onChange, onClose }: {
         </div>
       </div>
 
-      <button className="settings-reset" onClick={() => onChange(defaultReaderSettings)}>
+      <button className="settings-reset" onClick={() => { onChange(defaultReaderSettings); onThemeChange('light'); }}>
         <RotateCcw size={14} /> Standardeinstellungen
       </button>
     </section>

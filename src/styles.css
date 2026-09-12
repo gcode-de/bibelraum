@@ -36,6 +36,34 @@
   --shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
 }
 
+:root[data-theme='sepia'] {
+  color-scheme: light;
+  --canvas: #eee3ce; --paper: #f5ecd9; --paper-strong: #fbf4e6; --ink: #352e25;
+  --muted: #766c5e; --faint: #a39988; --line: #d5c7af; --line-soft: #e2d5c0;
+  --sidebar: #e6dac5; --topbar: rgba(238, 227, 206, .92); --shadow: 0 24px 60px rgba(65, 47, 27, .1);
+}
+
+:root[data-theme='gray'] {
+  color-scheme: light;
+  --canvas: #e8e8e5; --paper: #f0f0ed; --paper-strong: #f7f7f4; --ink: #292a28;
+  --muted: #6f716d; --faint: #999b96; --line: #cfd0cc; --line-soft: #dcddd9;
+  --sidebar: #dfdfdc; --topbar: rgba(232, 232, 229, .92); --shadow: 0 24px 60px rgba(30, 31, 29, .08);
+}
+
+:root[data-theme='black'] {
+  color-scheme: dark;
+  --canvas: #000; --paper: #0c0c0c; --paper-strong: #141414; --ink: #f0eee8;
+  --muted: #a4a49f; --faint: #70706d; --line: #2c2c2a; --line-soft: #20201e;
+  --accent: #e1876d; --accent-soft: #321b15; --sidebar: #080808;
+  --topbar: rgba(0, 0, 0, .92); --shadow: 0 24px 60px rgba(0, 0, 0, .55);
+}
+
+:root[data-accent='blue'] { --accent: #3979aa; --accent-soft: color-mix(in srgb, #3979aa 18%, var(--paper)); }
+:root[data-accent='green'] { --accent: #4e7d5f; --accent-soft: color-mix(in srgb, #4e7d5f 18%, var(--paper)); }
+:root[data-highlight='yellow'] { --highlight: color-mix(in srgb, #e8c85d 42%, transparent); }
+:root[data-highlight='rose'] { --highlight: color-mix(in srgb, #da8194 38%, transparent); }
+:root[data-highlight='blue'] { --highlight: color-mix(in srgb, #78aadb 36%, transparent); }
+
 * { box-sizing: border-box; }
 html { min-width: 320px; background: var(--canvas); scroll-behavior: smooth; }
 body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--canvas); color: var(--ink); }
@@ -127,8 +155,8 @@ kbd { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; backg
 .verse:hover { background: color-mix(in srgb, var(--accent-soft) 42%, transparent); }
 .verse.is-highlighted, .verse.is-selected { background: var(--accent-soft); }
 .verse.is-selected { box-shadow: inset 3px 0 var(--accent); }
-.verse.is-marked { background: color-mix(in srgb, #e8c85d 38%, transparent); }
-.verse.is-marked.is-selected { background: color-mix(in srgb, #e8c85d 55%, var(--accent-soft)); }
+.verse.is-marked { background: var(--highlight, color-mix(in srgb, #e8c85d 42%, transparent)); }
+.verse.is-marked.is-selected { box-shadow: inset 3px 0 var(--accent); filter: saturate(1.08); }
 .verses sup { display: inline-block; min-width: 25px; margin-right: 2px; color: var(--accent); font: 600 9px/1 Inter, Avenir, sans-serif; vertical-align: super; letter-spacing: .04em; }
 .chapter-footer { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 20px; margin-top: 72px; padding-top: 26px; border-top: 1px solid var(--line); }
 .chapter-link { display: flex; align-items: center; gap: 12px; width: fit-content; padding: 8px 0; border: 0; background: transparent; cursor: pointer; text-align: left; }
@@ -212,6 +240,24 @@ kbd { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; backg
 .font-choices button > span { overflow: hidden; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
 .font-choices button small { color: var(--muted); font-size: 9px; }
 .font-choices button i { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: white; }
+.theme-choices { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; }
+.theme-choices button { display: grid; gap: 6px; place-items: center; padding: 0 0 7px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--muted); cursor: pointer; }
+.theme-choices button.selected { border-color: var(--accent); color: var(--ink); }
+.theme-choices button > i { position: relative; display: block; width: 100%; aspect-ratio: 1.05; overflow: hidden; border: 1px solid var(--line); border-radius: 8px 8px 5px 5px; background: #fbf9f4; }
+.theme-choices button > i::before { content: ''; position: absolute; inset: 0 62% 0 0; background: #ebe7dd; }
+.theme-choices button > i span { position: absolute; right: 12%; bottom: 24%; width: 43%; height: 3px; border-radius: 2px; background: #9c432d; box-shadow: 0 -8px #242720, 0 8px #242720; }
+.theme-choices button.sepia > i { background: #f5ecd9; }.theme-choices button.sepia > i::before { background: #e6dac5; }
+.theme-choices button.gray > i { background: #f0f0ed; }.theme-choices button.gray > i::before { background: #dfdfdc; }
+.theme-choices button.dark > i { background: #20211e; }.theme-choices button.dark > i::before { background: #171816; }.theme-choices button.dark > i span { background: #dc8065; box-shadow: 0 -8px #ece9df, 0 8px #ece9df; }
+.theme-choices button.black > i { background: #000; }.theme-choices button.black > i::before { background: #0c0c0c; }.theme-choices button.black > i span { background: #e1876d; box-shadow: 0 -8px #f0eee8, 0 8px #f0eee8; }
+.theme-choices small { font-size: 8px; }
+.color-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.color-settings > div > span { display: block; margin-bottom: 10px; color: var(--muted); font-size: 10px; font-weight: 600; }
+.color-choices { display: flex; gap: 9px; }
+.color-choices button { width: 28px; height: 28px; padding: 0; border: 3px solid var(--paper-strong); border-radius: 50%; background: #9c432d; box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
+.color-choices button.blue { background: #3979aa; }.color-choices button.green { background: #4e7d5f; }
+.color-choices button.selected { box-shadow: 0 0 0 2px var(--ink); }
+.highlight-choices button { border-radius: 7px; background: #e8c85d; }.highlight-choices button.rose { background: #da8194; }.highlight-choices button.blue { background: #78aadb; }
 .settings-reset { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; margin-top: 24px; padding: 11px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 10px; }
 
 .verse-actions {
