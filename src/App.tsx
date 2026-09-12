@@ -20,7 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, TouchEvent as ReactTouchEvent } from 'react';
 import { api } from './api';
 import {
   loadReaderSettings,
@@ -94,6 +94,7 @@ export function App() {
   const [readerChromeVisible, setReaderChromeVisible] = useState(true);
   const searchInput = useRef<HTMLInputElement>(null);
   const lastScrollY = useRef(window.scrollY);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   const primaryCode = selectedCodes[0];
   const currentBook = books.find((book) => book.id === bookId);
@@ -354,6 +355,22 @@ export function App() {
       : [...current, selectedVerseKey]);
   }
 
+  function startSwipe(event: ReactTouchEvent<HTMLElement>) {
+    const touch = event.changedTouches[0];
+    touchStart.current = { x: touch.clientX, y: touch.clientY };
+  }
+
+  function finishSwipe(event: ReactTouchEvent<HTMLElement>) {
+    if (!touchStart.current || sidebarOpen || translationOpen || readerSettingsOpen) return;
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - touchStart.current.x;
+    const deltaY = touch.clientY - touchStart.current.y;
+    touchStart.current = null;
+
+    if (Math.abs(deltaX) < 72 || Math.abs(deltaX) < Math.abs(deltaY) * 1.35) return;
+    goTo(deltaX < 0 ? passage?.next ?? null : passage?.previous ?? null);
+  }
+
   return (
     <div className={`app-shell ${readerChromeVisible ? '' : 'chrome-hidden'}`} style={readerStyle}>
       <header className="topbar">
@@ -477,7 +494,7 @@ export function App() {
 
       {sidebarOpen && <button className="scrim" onClick={() => setSidebarOpen(false)} aria-label="Menü schließen" />}
 
-      <main className="reader">
+      <main className="reader" onTouchStart={startSwipe} onTouchEnd={finishSwipe}>
         <nav className="passage-nav" aria-label="Bibelstelle auswählen">
           <button
             className="nav-arrow"
@@ -591,6 +608,7 @@ export function App() {
                 </div>
                 <ChapterLink direction="next" location={passage?.next ?? null} onClick={goTo} />
               </nav>
+              <p className="swipe-hint mobile-only"><ArrowLeft size={13} /> Wischen zum Kapitelwechsel <ArrowRight size={13} /></p>
             </>
           )}
         </div>
