@@ -71,6 +71,24 @@ function loadRecentTranslations(initialCode: string) {
   }
 }
 
+function loadNumberList(key: string) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) ?? '[]');
+    return Array.isArray(saved) ? saved.filter((item): item is number => Number.isInteger(item)) : [];
+  } catch {
+    return [];
+  }
+}
+
+function loadBookProgress() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('bibelraum.book-progress') ?? '{}');
+    return saved && typeof saved === 'object' ? saved as Record<number, number> : {};
+  } catch {
+    return {};
+  }
+}
+
 function getInitialTheme() {
   const saved = localStorage.getItem('bibelraum.theme');
   if (saved === 'dark' || saved === 'light') return saved;
@@ -91,6 +109,9 @@ export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(getInitialTheme);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileExpandedBookId, setMobileExpandedBookId] = useState(initial.bookId);
+  const [bookFilter, setBookFilter] = useState('');
+  const [recentBookIds, setRecentBookIds] = useState(() => loadNumberList('bibelraum.recent-books'));
+  const [bookProgress, setBookProgress] = useState(loadBookProgress);
   const [translationOpen, setTranslationOpen] = useState(false);
   const [readerSettingsOpen, setReaderSettingsOpen] = useState(false);
   const [readerSettings, setReaderSettings] = useState(loadReaderSettings);
@@ -120,6 +141,7 @@ export function App() {
 
   const openBookPicker = useCallback(() => {
     setSearchOpen(false);
+    setBookFilter('');
     setMobileExpandedBookId(bookId);
     setSidebarOpen(true);
   }, [bookId]);
@@ -216,6 +238,19 @@ export function App() {
   useEffect(() => {
     localStorage.setItem('bibelraum.recent-translations', JSON.stringify(recentTranslations));
   }, [recentTranslations]);
+
+  useEffect(() => {
+    setRecentBookIds((current) => [bookId, ...current.filter((id) => id !== bookId)].slice(0, 5));
+    setBookProgress((current) => ({ ...current, [bookId]: Math.max(current[bookId] ?? 0, chapter) }));
+  }, [bookId, chapter]);
+
+  useEffect(() => {
+    localStorage.setItem('bibelraum.recent-books', JSON.stringify(recentBookIds));
+  }, [recentBookIds]);
+
+  useEffect(() => {
+    localStorage.setItem('bibelraum.book-progress', JSON.stringify(bookProgress));
+  }, [bookProgress]);
 
   useEffect(() => {
     if (!readerSettingsOpen) return;
@@ -499,11 +534,26 @@ export function App() {
               <BookLibrary books={books} currentBookId={bookId} onSelect={chooseBook} />
             </div>
             <div className="mobile-book-library">
+              <label className="book-filter">
+                <Search size={16} aria-hidden="true" />
+                <input
+                  value={bookFilter}
+                  onChange={(event) => setBookFilter(event.target.value)}
+                  placeholder="Buch suchen"
+                  aria-label="Buch suchen"
+                />
+                {bookFilter && (
+                  <button onClick={() => setBookFilter('')} aria-label="Buchsuche leeren"><X size={15} /></button>
+                )}
+              </label>
               <MobileBookPicker
                 books={books}
                 currentBookId={bookId}
                 currentChapter={chapter}
                 expandedBookId={mobileExpandedBookId}
+                filter={bookFilter}
+                recentBookIds={recentBookIds}
+                progress={bookProgress}
                 onExpand={setMobileExpandedBookId}
                 onSelectChapter={chooseChapter}
               />
@@ -674,6 +724,9 @@ function MobileBookPicker({
   currentBookId,
   currentChapter,
   expandedBookId,
+  filter,
+  recentBookIds,
+  progress,
   onExpand,
   onSelectChapter,
 }: {
@@ -681,49 +734,82 @@ function MobileBookPicker({
   currentBookId: number;
   currentChapter: number;
   expandedBookId: number;
+  filter: string;
+  recentBookIds: number[];
+  progress: Record<number, number>;
   onExpand: (bookId: number) => void;
   onSelectChapter: (bookId: number, chapter: number) => void;
 }) {
+  const normalizedFilter = filter.trim().toLocaleLowerCase('de-DE');
+  const filteredBooks = normalizedFilter
+    ? books.filter((book) => book.name.toLocaleLowerCase('de-DE').includes(normalizedFilter))
+    : books;
+  const recentBooks = recentBookIds
+    .map((id) => books.find((book) => book.id === id))
+    .filter((book): book is Book => Boolean(book));
+
+  function renderBook(book: Book) {
+    const isExpanded = book.id === expandedBookId;
+    const readChapter = progress[book.id] ?? 0;
+    const percentage = Math.min(100, Math.round((readChapter / book.chapters) * 100));
+    return (
+      <div className={`mobile-book-row ${isExpanded ? 'is-expanded' : ''}`} id={`mobile-book-${book.id}`} key={book.id}>
+        <button
+          className={book.id === currentBookId ? 'current' : ''}
+          onClick={() => onExpand(book.id)}
+          aria-expanded={isExpanded}
+        >
+          <span>{book.name}</span>
+          <small>{readChapter ? `bis Kapitel ${readChapter}` : `${book.chapters} Kapitel`}</small>
+        </button>
+        {readChapter > 0 && (
+          <span className="book-progress" aria-label={`${percentage} Prozent gelesen`}>
+            <i style={{ width: `${percentage}%` }} />
+          </span>
+        )}
+        {isExpanded && (
+          <div className="mobile-chapter-grid" aria-label={`Kapitel in ${book.name}`}>
+            {Array.from({ length: book.chapters }, (_, index) => {
+              const number = index + 1;
+              const isCurrent = book.id === currentBookId && number === currentChapter;
+              return (
+                <button
+                  className={`${isCurrent ? 'current' : ''} ${number <= readChapter ? 'visited' : ''}`}
+                  onClick={() => onSelectChapter(book.id, number)}
+                  aria-current={isCurrent ? 'page' : undefined}
+                  key={number}
+                >
+                  {number}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="mobile-book-picker">
+      {!normalizedFilter && recentBooks.length > 1 && (
+        <section className="recent-books">
+          <h3>Zuletzt gelesen</h3>
+          <div className="recent-book-list">
+            {recentBooks.map((book) => (
+              <button onClick={() => onExpand(book.id)} key={book.id}>
+                <span>{book.name}</span><small>Kapitel {progress[book.id] || 1}</small>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
       {([1, 2] as const).map((testament) => (
         <section key={testament}>
           <h3>{testament === 1 ? 'Altes Testament' : 'Neues Testament'}</h3>
-          {books.filter((book) => book.testament === testament).map((book) => {
-            const isExpanded = book.id === expandedBookId;
-            return (
-              <div className={`mobile-book-row ${isExpanded ? 'is-expanded' : ''}`} id={`mobile-book-${book.id}`} key={book.id}>
-                <button
-                  className={book.id === currentBookId ? 'current' : ''}
-                  onClick={() => onExpand(book.id)}
-                  aria-expanded={isExpanded}
-                >
-                  <span>{book.name}</span>
-                  <small>{book.chapters} Kapitel</small>
-                </button>
-                {isExpanded && (
-                  <div className="mobile-chapter-grid" aria-label={`Kapitel in ${book.name}`}>
-                    {Array.from({ length: book.chapters }, (_, index) => {
-                      const number = index + 1;
-                      const isCurrent = book.id === currentBookId && number === currentChapter;
-                      return (
-                        <button
-                          className={isCurrent ? 'current' : ''}
-                          onClick={() => onSelectChapter(book.id, number)}
-                          aria-current={isCurrent ? 'page' : undefined}
-                          key={number}
-                        >
-                          {number}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {filteredBooks.filter((book) => book.testament === testament).map(renderBook)}
         </section>
       ))}
+      {filteredBooks.length === 0 && <p className="empty-book-filter">Kein Buch zu „{filter}“ gefunden.</p>}
     </div>
   );
 }

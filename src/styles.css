@@ -264,7 +264,11 @@ kbd { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; backg
   .sidebar .search-box { flex: none; margin: 2px 4px 10px; height: 46px; }
   .desktop-book-library { display: none; }
   .mobile-book-library { display: block; flex: 1; min-height: 0; overflow: hidden; }
-  .mobile-book-picker { height: 100%; overflow-y: auto; padding: 6px 4px 60px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  .book-filter { height: 42px; display: flex; align-items: center; gap: 8px; margin: 1px 4px 5px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+  .book-filter svg { flex: none; color: var(--muted); }
+  .book-filter input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 12px; }
+  .book-filter button { display: grid; place-items: center; padding: 3px; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+  .mobile-book-picker { height: calc(100% - 48px); overflow-y: auto; padding: 6px 4px 60px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
   .mobile-book-picker section + section { margin-top: 28px; padding-top: 28px; border-top: 1px solid var(--line); }
   .mobile-book-picker section > h3 {
     position: sticky; top: 0; z-index: 2; margin: 0 -2px 8px; padding: 10px 2px;
@@ -278,12 +282,20 @@ kbd { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; backg
   }
   .mobile-book-row > button.current span, .mobile-book-row.is-expanded > button span { color: var(--accent); font-weight: 600; }
   .mobile-book-row > button small { color: var(--faint); font-size: 10px; font-weight: 500; }
+  .book-progress { display: block; height: 2px; margin: -5px 0 8px; overflow: hidden; border-radius: 2px; background: var(--line-soft); }
+  .book-progress i { display: block; height: 100%; border-radius: inherit; background: var(--accent); opacity: .55; }
+  .recent-book-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .recent-book-list button { min-width: 0; display: grid; gap: 3px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); cursor: pointer; text-align: left; }
+  .recent-book-list span { overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+  .recent-book-list small { color: var(--muted); font-size: 9px; }
   .mobile-chapter-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; padding: 3px 0 18px; }
   .mobile-chapter-grid button {
     aspect-ratio: 1.18; min-height: 52px; padding: 0; border: 1px solid transparent; border-radius: 9px;
     background: var(--line-soft); color: var(--ink); cursor: pointer; font-size: 15px; font-weight: 600;
   }
   .mobile-chapter-grid button.current { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .mobile-chapter-grid button.visited:not(.current) { border-color: color-mix(in srgb, var(--accent) 28%, transparent); }
+  .empty-book-filter { padding: 40px 10px; color: var(--muted); text-align: center; font-size: 12px; }
   .sidebar-note { display: none; }
   .scrim { display: block; position: fixed; z-index: 40; inset: 0; border: 0; background: rgba(10, 12, 9, .45); backdrop-filter: blur(2px); }
   .reader { margin-left: 0; padding-top: 62px; }
