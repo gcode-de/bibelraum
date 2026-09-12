@@ -8,6 +8,7 @@ import {
   CircleAlert,
   Copy,
   Columns3,
+  FlaskConical,
   Highlighter,
   Library,
   Link2,
@@ -118,6 +119,10 @@ function getInitialTheme() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
+function getInitialExpertMode() {
+  return localStorage.getItem('bibelraum.expert-mode') === 'true';
+}
+
 export function App() {
   const initial = useMemo(getInitialLocation, []);
   const [translations, setTranslations] = useState<Translation[]>([]);
@@ -136,6 +141,7 @@ export function App() {
   const [recentBookIds, setRecentBookIds] = useState(() => loadNumberList('bibelraum.recent-books'));
   const [bookProgress, setBookProgress] = useState(loadBookProgress);
   const [translationOpen, setTranslationOpen] = useState(false);
+  const [expertMode, setExpertMode] = useState(getInitialExpertMode);
   const [readerSettingsOpen, setReaderSettingsOpen] = useState(false);
   const [readerSettings, setReaderSettings] = useState(loadReaderSettings);
   const [searchQuery, setSearchQuery] = useState('');
@@ -287,13 +293,17 @@ export function App() {
   }, [bookProgress]);
 
   useEffect(() => {
-    if (!readerSettingsOpen) return;
+    if (!readerSettingsOpen && !translationOpen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [readerSettingsOpen]);
+  }, [readerSettingsOpen, translationOpen]);
+
+  useEffect(() => {
+    localStorage.setItem('bibelraum.expert-mode', String(expertMode));
+  }, [expertMode]);
 
   useEffect(() => {
     localStorage.setItem('bibelraum.translation', primaryCode);
@@ -416,9 +426,16 @@ export function App() {
   }
 
   function choosePrimary(code: string) {
-    setSelectedCodes((current) => [code, ...current.filter((item) => item !== code)].slice(0, 3));
+    setSelectedCodes((current) => expertMode
+      ? [code, ...current.filter((item) => item !== code)].slice(0, 3)
+      : [code]);
     setRecentTranslations((current) => [code, ...current.filter((item) => item !== code)].slice(0, 4));
     setTranslationOpen(false);
+  }
+
+  function changeExpertMode(enabled: boolean) {
+    setExpertMode(enabled);
+    if (!enabled) setSelectedCodes((current) => current.slice(0, 1));
   }
 
   function toggleComparison(code: string) {
@@ -561,20 +578,23 @@ export function App() {
           </button>
         </div>
 
-        {translationOpen && (
-          <>
-            <button className="translation-scrim" onClick={() => setTranslationOpen(false)} aria-label="Übersetzungsauswahl schließen" />
-            <TranslationMenu
-              translations={translations}
-              selectedCodes={selectedCodes}
-              recentCodes={recentTranslations}
-              onChoosePrimary={choosePrimary}
-              onToggleComparison={toggleComparison}
-              onClose={() => setTranslationOpen(false)}
-            />
-          </>
-        )}
       </header>
+
+      {translationOpen && (
+        <>
+          <button className="translation-scrim" onClick={() => setTranslationOpen(false)} aria-label="Übersetzungsauswahl schließen" />
+          <TranslationMenu
+            translations={translations}
+            selectedCodes={selectedCodes}
+            recentCodes={recentTranslations}
+            expertMode={expertMode}
+            onExpertModeChange={changeExpertMode}
+            onChoosePrimary={choosePrimary}
+            onToggleComparison={toggleComparison}
+            onClose={() => setTranslationOpen(false)}
+          />
+        </>
+      )}
 
       {readerSettingsOpen && (
         <>
@@ -1027,10 +1047,12 @@ function BookLibrary({ books, currentBookId, onSelect }: {
   );
 }
 
-function TranslationMenu({ translations, selectedCodes, recentCodes, onChoosePrimary, onToggleComparison, onClose }: {
+function TranslationMenu({ translations, selectedCodes, recentCodes, expertMode, onExpertModeChange, onChoosePrimary, onToggleComparison, onClose }: {
   translations: Translation[];
   selectedCodes: string[];
   recentCodes: string[];
+  expertMode: boolean;
+  onExpertModeChange: (enabled: boolean) => void;
   onChoosePrimary: (code: string) => void;
   onToggleComparison: (code: string) => void;
   onClose: () => void;
@@ -1040,13 +1062,18 @@ function TranslationMenu({ translations, selectedCodes, recentCodes, onChoosePri
     .filter((translation): translation is Translation => Boolean(translation));
 
   return (
-    <div className="translation-menu" role="dialog" aria-modal="true" aria-labelledby="translation-menu-title">
+    <div className={`translation-menu ${expertMode ? 'is-expert' : ''}`} role="dialog" aria-modal="true" aria-labelledby="translation-menu-title">
       <div className="translation-handle" aria-hidden="true" />
       <div className="menu-heading">
         <div><span className="eyebrow">Ausgabe wählen</span><h2 id="translation-menu-title">Übersetzungen</h2></div>
         <button className="icon-button" onClick={onClose} aria-label="Schließen"><X size={18} /></button>
       </div>
-      <p>Wähle deinen Haupttext oder vergleiche bis zu drei Ausgaben parallel.</p>
+      <p>{expertMode ? 'Wähle einen Haupttext und bis zu zwei weitere Ausgaben für die Parallelansicht.' : 'Wähle eine Bibelübersetzung für deine Leseansicht.'}</p>
+      <button className="expert-mode-toggle" onClick={() => onExpertModeChange(!expertMode)} aria-pressed={expertMode}>
+        <FlaskConical size={18} />
+        <span><b>Expertenmodus</b><small>Mehrere Übersetzungen parallel vergleichen</small></span>
+        <i><span /></i>
+      </button>
       {recent.length > 1 && (
         <div className="recent-translations">
           <span>Zuletzt verwendet</span>
@@ -1074,15 +1101,17 @@ function TranslationMenu({ translations, selectedCodes, recentCodes, onChoosePri
                 <span><b>{translation.name}</b><small>{translation.verseCount.toLocaleString('de-DE')} Verse</small></span>
                 {isPrimary && <Check size={16} />}
               </button>
-              <button
-                className={`compare-button ${isSelected ? 'selected' : ''}`}
-                onClick={() => onToggleComparison(translation.code)}
-                disabled={!isSelected && selectedCodes.length >= 3}
-                aria-label={`${translation.name} ${isSelected ? 'aus Vergleich entfernen' : 'vergleichen'}`}
-                title="Parallel vergleichen"
-              >
-                {isSelected ? <Check size={15} /> : <Plus size={15} />}
-              </button>
+              {expertMode && (
+                <button
+                  className={`compare-button ${isSelected ? 'selected' : ''}`}
+                  onClick={() => onToggleComparison(translation.code)}
+                  disabled={!isSelected && selectedCodes.length >= 3}
+                  aria-label={`${translation.name} ${isSelected ? 'aus Vergleich entfernen' : 'vergleichen'}`}
+                  title="Parallel vergleichen"
+                >
+                  {isSelected ? <Check size={15} /> : <Plus size={15} />}
+                </button>
+              )}
             </div>
           );
         })}

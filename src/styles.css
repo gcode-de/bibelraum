@@ -195,17 +195,27 @@ kbd { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; backg
 .swipe-hint { display: none; }
 
 .translation-scrim { position: fixed; z-index: 45; inset: 0; border: 0; background: rgba(12, 13, 11, .28); backdrop-filter: blur(2px); }
-.translation-menu { position: fixed; z-index: 50; top: 62px; right: 24px; width: min(430px, calc(100vw - 32px)); max-height: calc(100vh - 82px); overflow-y: auto; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper-strong); box-shadow: var(--shadow); }
+.translation-menu { position: fixed; z-index: 50; top: 76px; right: 24px; width: min(430px, calc(100vw - 32px)); max-height: calc(100dvh - 96px); overflow-y: auto; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper-strong); box-shadow: var(--shadow); }
 .translation-handle { display: none; }
 .menu-heading { display: flex; justify-content: space-between; align-items: center; }
 .translation-menu > p { margin: 12px 0 18px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.expert-mode-toggle { width: 100%; display: grid; grid-template-columns: 28px 1fr 38px; align-items: center; gap: 9px; margin: 0 0 18px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--muted); cursor: pointer; text-align: left; }
+.expert-mode-toggle > span { display: grid; gap: 2px; }
+.expert-mode-toggle b { color: var(--ink); font-size: 11px; }
+.expert-mode-toggle small { color: var(--muted); font-size: 9px; }
+.expert-mode-toggle > i { position: relative; width: 36px; height: 20px; border-radius: 10px; background: var(--line); transition: background .15s ease; }
+.expert-mode-toggle > i span { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--paper-strong); box-shadow: 0 1px 3px rgba(0,0,0,.18); transition: transform .15s ease; }
+.expert-mode-toggle[aria-pressed='true'] { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--accent-soft); color: var(--accent); }
+.expert-mode-toggle[aria-pressed='true'] > i { background: var(--accent); }
+.expert-mode-toggle[aria-pressed='true'] > i span { transform: translateX(16px); }
 .recent-translations { margin: 0 0 18px; padding-bottom: 17px; border-bottom: 1px solid var(--line-soft); }
 .recent-translations > span { display: block; margin-bottom: 8px; color: var(--faint); font-size: 9px; text-transform: uppercase; letter-spacing: .12em; }
 .recent-translations > div { display: flex; flex-wrap: wrap; gap: 7px; }
 .recent-translations button { min-width: 60px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 18px; background: var(--paper); color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: .06em; }
 .recent-translations button.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .translation-list { display: grid; gap: 5px; }
-.translation-option { display: grid; grid-template-columns: 1fr 35px; gap: 5px; border: 1px solid transparent; border-radius: 9px; }
+.translation-option { display: grid; grid-template-columns: 1fr; gap: 5px; border: 1px solid transparent; border-radius: 9px; }
+.translation-menu.is-expert .translation-option { grid-template-columns: 1fr 35px; }
 .translation-option:hover, .translation-option.primary { border-color: var(--line); background: var(--paper); }
 .choose-translation { display: grid; grid-template-columns: 43px 1fr 18px; align-items: center; gap: 8px; padding: 9px 7px; border: 0; background: transparent; cursor: pointer; text-align: left; }
 .option-code { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .06em; }
@@ -399,7 +409,7 @@ kbd { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; backg
   .chapter-link.next { min-width: 150px; justify-content: flex-end; }
   .swipe-hint { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 15px 0 0; color: var(--faint); font-size: 9px; }
   .translation-menu {
-    inset: auto 0 0; width: 100%; max-height: calc(100vh - max(48px, env(safe-area-inset-top)));
+    inset: auto 0 0; width: 100%; max-height: calc(100dvh - max(24px, env(safe-area-inset-top)));
     padding: 12px 20px max(20px, env(safe-area-inset-bottom)); border: 0; border-radius: 28px 28px 0 0;
   }
   .translation-handle { display: block; width: 46px; height: 4px; margin: 0 auto 14px; border-radius: 2px; background: var(--line); }
