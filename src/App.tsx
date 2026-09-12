@@ -68,7 +68,9 @@ export function App() {
   const [searching, setSearching] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [highlightedVerse, setHighlightedVerse] = useState<number | null>(null);
+  const [readerChromeVisible, setReaderChromeVisible] = useState(true);
   const searchInput = useRef<HTMLInputElement>(null);
+  const lastScrollY = useRef(window.scrollY);
 
   const primaryCode = selectedCodes[0];
   const currentBook = books.find((book) => book.id === bookId);
@@ -83,6 +85,30 @@ export function App() {
     setMobileExpandedBookId(bookId);
     setSidebarOpen(true);
   }, [bookId]);
+
+  useEffect(() => {
+    function onScroll() {
+      const currentScrollY = window.scrollY;
+      const delta = currentScrollY - lastScrollY.current;
+
+      if (currentScrollY < 72 || delta < -8) {
+        setReaderChromeVisible(true);
+      } else if (delta > 8 && currentScrollY > 150) {
+        setReaderChromeVisible(false);
+      }
+
+      lastScrollY.current = currentScrollY;
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (sidebarOpen || translationOpen || readerSettingsOpen) {
+      setReaderChromeVisible(true);
+    }
+  }, [sidebarOpen, translationOpen, readerSettingsOpen]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -266,7 +292,7 @@ export function App() {
   }
 
   return (
-    <div className="app-shell" style={readerStyle}>
+    <div className={`app-shell ${readerChromeVisible ? '' : 'chrome-hidden'}`} style={readerStyle}>
       <header className="topbar">
         <button className="icon-button mobile-only" onClick={openBookPicker} aria-label="Bücher öffnen">
           <Menu size={20} />
