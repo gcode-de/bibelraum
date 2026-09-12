@@ -61,7 +61,7 @@ function getInitialLocation() {
     chapter: Number.isInteger(chapter) && chapter > 0 ? chapter : Number(saved.chapter) || DEFAULT_CHAPTER,
     translation: params.get('uebersetzung')?.toUpperCase() ||
       saved.translation || localStorage.getItem('bibelraum.translation') || DEFAULT_TRANSLATION,
-    verse: Number(params.get('vers')) || null,
+    verse: Number(params.get('vers')?.split(',')[0]) || null,
     scrollY: hasUrlLocation ? 0 : Math.max(0, Number(saved.scrollY) || 0),
   };
 }
@@ -140,7 +140,7 @@ export function App() {
   const [searching, setSearching] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [highlightedVerse, setHighlightedVerse] = useState<number | null>(initial.verse);
-  const [selectedVerse, setSelectedVerse] = useState<SelectedVerse | null>(null);
+  const [selectedVerses, setSelectedVerses] = useState<SelectedVerse[]>([]);
   const [markedVerses, setMarkedVerses] = useState<string[]>(loadMarkedVerses);
   const [verseActionMessage, setVerseActionMessage] = useState('');
   const [readerChromeVisible, setReaderChromeVisible] = useState(true);
@@ -152,9 +152,11 @@ export function App() {
 
   const primaryCode = selectedCodes[0];
   const currentBook = books.find((book) => book.id === bookId);
-  const selectedVerseKey = selectedVerse
-    ? `${selectedVerse.translationCode}:${bookId}:${chapter}:${selectedVerse.verse}`
-    : null;
+  const selectedVerseKeys = selectedVerses.map(
+    (verse) => `${verse.translationCode}:${bookId}:${chapter}:${verse.verse}`,
+  );
+  const allSelectedVersesMarked = selectedVerseKeys.length > 0 &&
+    selectedVerseKeys.every((key) => markedVerses.includes(key));
   const readerStyle = {
     '--reader-font-size': `${readerSettings.fontSize}px`,
     '--reader-line-height': String(readerSettings.lineHeight),
@@ -369,7 +371,7 @@ export function App() {
 
   const goTo = useCallback((location: PassageLocation | null) => {
     if (!location) return;
-    setSelectedVerse(null);
+    setSelectedVerses([]);
     setBookId(location.bookId);
     setChapter(location.chapter);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -392,7 +394,7 @@ export function App() {
   }, [goTo, passage]);
 
   function chooseBook(nextBookId: number) {
-    setSelectedVerse(null);
+    setSelectedVerses([]);
     setBookId(nextBookId);
     setChapter(1);
     setSidebarOpen(false);
@@ -401,7 +403,7 @@ export function App() {
   }
 
   function chooseChapter(nextBookId: number, nextChapter: number) {
-    setSelectedVerse(null);
+    setSelectedVerses([]);
     setBookId(nextBookId);
     setChapter(nextChapter);
     setMobileExpandedBookId(nextBookId);
@@ -441,7 +443,7 @@ export function App() {
   }
 
   function openSearchResult(result: SearchResult) {
-    setSelectedVerse(null);
+    setSelectedVerses([]);
     setBookId(result.bookId);
     setChapter(result.chapter);
     setHighlightedVerse(result.verse);
@@ -453,6 +455,20 @@ export function App() {
     return `${currentBook?.name ?? passage?.book.name ?? 'Bibel'} ${chapter},${verse.verse} (${verse.translationCode})`;
   }
 
+  function selectionLabel() {
+    if (selectedVerses.length === 1) return verseReference(selectedVerses[0]);
+    const translationCodes = new Set(selectedVerses.map((verse) => verse.translationCode));
+    const verseNumbers = [...new Set(selectedVerses.map((verse) => verse.verse))].sort((a, b) => a - b);
+    if (translationCodes.size === 1) {
+      return `${currentBook?.name ?? passage?.book.name ?? 'Bibel'} ${chapter},${verseNumbers.join('.')} (${selectedVerses[0].translationCode})`;
+    }
+    return `${selectedVerses.length} Verse ausgewählt`;
+  }
+
+  function selectedVerseText() {
+    return selectedVerses.map((verse) => `${verseReference(verse)}\n${verse.text}`).join('\n\n');
+  }
+
   async function copyText(value: string, message: string) {
     await navigator.clipboard.writeText(value);
     setVerseActionMessage(message);
@@ -460,22 +476,22 @@ export function App() {
   }
 
   async function shareVerse() {
-    if (!selectedVerse) return;
-    const text = `${verseReference(selectedVerse)}\n${selectedVerse.text}`;
+    if (selectedVerses.length === 0) return;
+    const text = selectedVerseText();
     const url = new URL(window.location.href);
-    url.searchParams.set('vers', String(selectedVerse.verse));
+    url.searchParams.set('vers', [...new Set(selectedVerses.map((verse) => verse.verse))].sort((a, b) => a - b).join(','));
     if (navigator.share) {
-      await navigator.share({ title: verseReference(selectedVerse), text, url: url.toString() });
+      await navigator.share({ title: selectionLabel(), text, url: url.toString() });
     } else {
-      await copyText(`${text}\n${url}`, 'Vers und Link kopiert');
+      await copyText(`${text}\n${url}`, `${selectedVerses.length === 1 ? 'Vers' : 'Verse'} und Link kopiert`);
     }
   }
 
   function toggleVerseMark() {
-    if (!selectedVerseKey) return;
-    setMarkedVerses((current) => current.includes(selectedVerseKey)
-      ? current.filter((key) => key !== selectedVerseKey)
-      : [...current, selectedVerseKey]);
+    if (selectedVerseKeys.length === 0) return;
+    setMarkedVerses((current) => allSelectedVersesMarked
+      ? current.filter((key) => !selectedVerseKeys.includes(key))
+      : [...new Set([...current, ...selectedVerseKeys])]);
   }
 
   function startSwipe(event: ReactTouchEvent<HTMLElement>) {
@@ -727,15 +743,16 @@ export function App() {
                             className={[
                               'verse',
                               highlightedVerse === item.verse ? 'is-highlighted' : '',
-                              selectedVerse?.verse === item.verse && selectedVerse.translationCode === translation.code ? 'is-selected' : '',
+                              selectedVerses.some((verse) => verse.verse === item.verse && verse.translationCode === translation.code) ? 'is-selected' : '',
                               markedVerses.includes(`${translation.code}:${bookId}:${chapter}:${item.verse}`) ? 'is-marked' : '',
                             ].filter(Boolean).join(' ')}
-                            onClick={() => setSelectedVerse((current) => (
-                              current?.verse === item.verse && current.translationCode === translation.code
-                                ? null
-                                : { ...item, translationCode: translation.code }
-                            ))}
-                            aria-pressed={selectedVerse?.verse === item.verse && selectedVerse.translationCode === translation.code}
+                            onClick={() => setSelectedVerses((current) => {
+                              const exists = current.some((verse) => verse.verse === item.verse && verse.translationCode === translation.code);
+                              return exists
+                                ? current.filter((verse) => verse.verse !== item.verse || verse.translationCode !== translation.code)
+                                : [...current, { ...item, translationCode: translation.code }];
+                            })}
+                            aria-pressed={selectedVerses.some((verse) => verse.verse === item.verse && verse.translationCode === translation.code)}
                             key={item.verse}
                           >
                             <sup>{item.verse}</sup>
@@ -763,13 +780,13 @@ export function App() {
         </div>
       </main>
 
-      {selectedVerse && (
-        <div className="verse-actions" role="toolbar" aria-label={`Aktionen für ${verseReference(selectedVerse)}`}>
+      {selectedVerses.length > 0 && (
+        <div className="verse-actions" role="toolbar" aria-label={`Aktionen für ${selectionLabel()}`}>
           <div className="verse-actions-reference">
-            <b>{verseReference(selectedVerse)}</b>
-            <span>{verseActionMessage || 'Vers ausgewählt'}</span>
+            <b>{selectionLabel()}</b>
+            <span>{verseActionMessage || `${selectedVerses.length} ${selectedVerses.length === 1 ? 'Vers' : 'Verse'} ausgewählt`}</span>
           </div>
-          <button onClick={() => copyText(`${verseReference(selectedVerse)}\n${selectedVerse.text}`, 'Vers kopiert')}>
+          <button onClick={() => copyText(selectedVerseText(), `${selectedVerses.length === 1 ? 'Vers' : `${selectedVerses.length} Verse`} kopiert`)}>
             <Copy size={18} /><span>Kopieren</span>
           </button>
           <button onClick={shareVerse}>
@@ -777,15 +794,15 @@ export function App() {
           </button>
           <button onClick={() => {
             const url = new URL(window.location.href);
-            url.searchParams.set('vers', String(selectedVerse.verse));
+            url.searchParams.set('vers', [...new Set(selectedVerses.map((verse) => verse.verse))].sort((a, b) => a - b).join(','));
             copyText(url.toString(), 'Link kopiert');
           }}>
             <Link2 size={18} /><span>Link</span>
           </button>
-          <button className={selectedVerseKey && markedVerses.includes(selectedVerseKey) ? 'active' : ''} onClick={toggleVerseMark}>
+          <button className={allSelectedVersesMarked ? 'active' : ''} onClick={toggleVerseMark}>
             <Highlighter size={18} /><span>Markieren</span>
           </button>
-          <button className="verse-actions-close" onClick={() => setSelectedVerse(null)} aria-label="Versauswahl schließen">
+          <button className="verse-actions-close" onClick={() => setSelectedVerses([])} aria-label="Versauswahl schließen">
             <X size={19} />
           </button>
         </div>
