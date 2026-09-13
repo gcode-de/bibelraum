@@ -12,6 +12,9 @@ export const config = {
   studyArchivePath: process.env.STUDY_ARCHIVE
     ? path.resolve(process.env.STUDY_ARCHIVE)
     : undefined,
+  extendedArchivePath: process.env.EXTENDED_ARCHIVE
+    ? path.resolve(process.env.EXTENDED_ARCHIVE)
+    : undefined,
   databasePath: path.resolve(
     process.env.BIBLE_DB ?? path.join(projectRoot, 'data', 'das-wort.sqlite'),
   ),

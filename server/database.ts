@@ -18,9 +18,11 @@ const translationCodes: Record<string, string> = {
   'Schlachter 2000': 'SLT',
   'Volxbibel': 'VXB',
   'Zürcher Bibel': 'ZB',
+  'Die Bibel in deutscher Fassung (Jantzen/Jettel)': 'BDF',
+  'Neue Genfer Übersetzung (veröffentlichte Bücher)': 'NGÜ',
 };
 
-const DATABASE_SCHEMA_VERSION = '2';
+const DATABASE_SCHEMA_VERSION = '3';
 
 export function createSchema(db: DatabaseSync) {
   db.exec(`
@@ -62,13 +64,22 @@ export function createSchema(db: DatabaseSync) {
       title TEXT NOT NULL,
       author TEXT NOT NULL DEFAULT '',
       copyright TEXT NOT NULL DEFAULT '',
-      usage_notice TEXT NOT NULL DEFAULT ''
+      usage_notice TEXT NOT NULL DEFAULT '',
+      scope TEXT NOT NULL DEFAULT '',
+      theological_profile TEXT NOT NULL DEFAULT '',
+      source_quality TEXT NOT NULL DEFAULT '',
+      source_url TEXT NOT NULL DEFAULT '',
+      mapping_warning TEXT NOT NULL DEFAULT ''
     );
     CREATE TABLE IF NOT EXISTS study_comments (
       id INTEGER PRIMARY KEY,
       source_id INTEGER NOT NULL REFERENCES study_sources(id) ON DELETE CASCADE,
+      source_comment_id INTEGER NOT NULL,
+      heading TEXT NOT NULL DEFAULT '',
+      page INTEGER,
+      mapping_quality TEXT NOT NULL DEFAULT '',
       text TEXT NOT NULL,
-      UNIQUE (source_id, text)
+      UNIQUE (source_id, source_comment_id)
     );
     CREATE TABLE IF NOT EXISTS study_comment_links (
       comment_id INTEGER NOT NULL REFERENCES study_comments(id) ON DELETE CASCADE,
@@ -129,6 +140,32 @@ function readStudyMetadata(db: DatabaseSync) {
   return Object.fromEntries(rows.map(({ key, value }) => [key, value ?? '']));
 }
 
+function sourceTableExists(db: DatabaseSync, table: string) {
+  return Boolean(db.prepare(`
+    SELECT 1 FROM source.sqlite_schema WHERE type = 'table' AND name = ?
+  `).get(table));
+}
+
+function sourceColumnNames(db: DatabaseSync, table: string) {
+  return new Set(
+    (db.prepare(`PRAGMA source.table_info(${table})`).all() as Array<{ name: string }>).map((row) => row.name),
+  );
+}
+
+function moduleKind(modulePath: string) {
+  const source = new DatabaseSync(modulePath, { readOnly: true });
+  try {
+    const tables = new Set(
+      (source.prepare("SELECT name FROM sqlite_schema WHERE type = 'table'").all() as Array<{ name: string }>).map((row) => row.name),
+    );
+    if (tables.has('study_comment') && tables.has('study_comment_link')) return 'study';
+    if (tables.has('metadata') && tables.has('book') && tables.has('verse')) return 'bible';
+    return 'unknown';
+  } finally {
+    source.close();
+  }
+}
+
 function slugify(value: string) {
   return value
     .normalize('NFKD')
@@ -152,6 +189,10 @@ function importModule(db: DatabaseSync, modulePath: string) {
     const metadata = readSourceMetadata(db);
     const sourceName = metadata.name || path.basename(modulePath, '.sqlite');
     const code = translationCodes[sourceName] ?? sourceName.toUpperCase().replace(/[^A-Z0-9ÄÖÜ]/g, '');
+
+    if (db.prepare('SELECT 1 FROM translations WHERE code = ?').get(code)) {
+      return code;
+    }
 
     db.exec('BEGIN');
     const translationResult = db.prepare(`
@@ -192,7 +233,7 @@ function importStudyModule(db: DatabaseSync, modulePath: string) {
   try {
     const metadata = readStudyMetadata(db);
     const bibleMetadata = readSourceMetadata(db);
-    const title = metadata.study_title || 'Studienkommentar';
+    const title = metadata.study_title || metadata.title || 'Studienkommentar';
     const sourceName = bibleMetadata.name || 'Schlachter 2000';
     const translationCode = translationCodes[sourceName] ?? 'SLT';
     const copyright = [
@@ -200,24 +241,48 @@ function importStudyModule(db: DatabaseSync, modulePath: string) {
       metadata.copyright_german,
       metadata.copyright_bible,
     ].filter(Boolean).join('\n');
+    const usageNotice = metadata.usage_notice || metadata.rights || '';
+    const sourceUrl = metadata.source_url || metadata.source_pdf || metadata.source_notes || '';
+    const sourceQuality = sourceTableExists(db, 'study_source')
+      ? ((db.prepare(`
+          SELECT GROUP_CONCAT(DISTINCT source_quality) AS quality FROM source.study_source
+        `).get() as { quality?: string } | undefined)?.quality ?? '')
+      : '';
+    const commentColumns = sourceColumnNames(db, 'study_comment');
+    const linkColumns = sourceColumnNames(db, 'study_comment_link');
+    const slug = slugify(`${title}-${metadata.study_author || metadata.author || translationCode}`);
 
     db.exec('BEGIN');
     const sourceResult = db.prepare(`
-      INSERT INTO study_sources (slug, translation_code, title, author, copyright, usage_notice)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO study_sources (
+        slug, translation_code, title, author, copyright, usage_notice,
+        scope, theological_profile, source_quality, source_url, mapping_warning
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      slugify(`${title}-${translationCode}`),
+      slug,
       translationCode,
       title,
-      metadata.study_author ?? '',
-      copyright,
-      metadata.usage_notice ?? '',
+      metadata.study_author || metadata.author || '',
+      copyright || metadata.rights || '',
+      usageNotice,
+      metadata.scope || '',
+      metadata.theological_profile || '',
+      sourceQuality,
+      sourceUrl,
+      metadata.mapping_warning || '',
     );
     const sourceId = Number(sourceResult.lastInsertRowid);
 
     db.prepare(`
-      INSERT INTO study_comments (source_id, text)
-      SELECT ?, text
+      INSERT INTO study_comments (
+        source_id, source_comment_id, heading, page, mapping_quality, text
+      )
+      SELECT ?, id,
+             ${commentColumns.has('heading') ? "COALESCE(heading, '')" : "''"},
+             ${commentColumns.has('page') ? 'page' : 'NULL'},
+             ${commentColumns.has('mapping_quality') ? "COALESCE(mapping_quality, '')" : "''"},
+             text
       FROM source.study_comment
       ORDER BY id
     `).run(sourceId);
@@ -225,16 +290,17 @@ function importStudyModule(db: DatabaseSync, modulePath: string) {
     db.prepare(`
       INSERT INTO study_comment_links (comment_id, book_ref_id, chapter, verse, source_url)
       SELECT destination_comment.id, source_book.book_reference_id,
-             source_link.chapter, source_link.verse, source_link.source_url
+             source_link.chapter, source_link.verse,
+             ${linkColumns.has('source_url') ? "COALESCE(source_link.source_url, '')" : '?'}
       FROM source.study_comment_link source_link
-      JOIN source.study_comment source_comment ON source_comment.id = source_link.comment_id
       JOIN source.book source_book ON source_book.id = source_link.book_id
       JOIN study_comments destination_comment
-        ON destination_comment.source_id = ? AND destination_comment.text = source_comment.text
+        ON destination_comment.source_id = ?
+       AND destination_comment.source_comment_id = source_link.comment_id
       ORDER BY source_book.book_reference_id, source_link.chapter, source_link.verse
-    `).run(sourceId);
+    `).run(...(linkColumns.has('source_url') ? [sourceId] : [sourceUrl, sourceId]));
     db.exec('COMMIT');
-    return slugify(`${title}-${translationCode}`);
+    return slug;
   } catch (error) {
     if (db.isTransaction) db.exec('ROLLBACK');
     throw error;
@@ -248,6 +314,7 @@ async function rebuildDatabase(
   databasePath: string,
   signature: string,
   studyArchivePath?: string,
+  extendedArchivePath?: string,
 ) {
   await mkdir(path.dirname(databasePath), { recursive: true });
   const importPath = `${databasePath}.importing`;
@@ -255,10 +322,17 @@ async function rebuildDatabase(
   const tempDirectory = await mkdtemp(path.join(tmpdir(), 'das-wort-'));
 
   try {
-    const modules = await extractModules(archivePath, tempDirectory, 'bible');
-    const studyModules = studyArchivePath
+    const primaryModules = await extractModules(archivePath, tempDirectory, 'primary');
+    const studyArchiveModules = studyArchivePath
       ? await extractModules(studyArchivePath, tempDirectory, 'study')
       : [];
+    const extendedModules = extendedArchivePath
+      ? await extractModules(extendedArchivePath, tempDirectory, 'extended')
+      : [];
+    const allModules = [...primaryModules, ...studyArchiveModules, ...extendedModules]
+      .map((modulePath) => ({ modulePath, kind: moduleKind(modulePath) }));
+    const modules = allModules.filter(({ kind }) => kind === 'bible').map(({ modulePath }) => modulePath);
+    const studyModules = allModules.filter(({ kind }) => kind === 'study').map(({ modulePath }) => modulePath);
     const db = new DatabaseSync(importPath);
     try {
       db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;');
@@ -295,6 +369,7 @@ export async function openBibleDatabase(
   archivePath: string,
   databasePath: string,
   studyArchivePath?: string,
+  extendedArchivePath?: string,
 ) {
   let bibleSignature: string | undefined;
   try {
@@ -312,8 +387,17 @@ export async function openBibleDatabase(
     }
   }
 
+  let extendedSignature: string | undefined;
+  if (extendedArchivePath) {
+    try {
+      extendedSignature = await archiveSignature(extendedArchivePath);
+    } catch {
+      throw new Error(`Erweitertes Bibelarchiv nicht gefunden: ${extendedArchivePath}`);
+    }
+  }
+
   const signature = bibleSignature
-    ? `${DATABASE_SCHEMA_VERSION}|bible:${bibleSignature}|study:${studySignature ?? 'none'}`
+    ? `${DATABASE_SCHEMA_VERSION}|bible:${bibleSignature}|study:${studySignature ?? 'none'}|extended:${extendedSignature ?? 'none'}`
     : undefined;
 
   let isCurrent = false;
@@ -333,7 +417,13 @@ export async function openBibleDatabase(
       throw new Error(`Bibelarchiv nicht gefunden: ${archivePath}`);
     }
     console.log('Bibelarchiv wird einmalig importiert …');
-    await rebuildDatabase(archivePath, databasePath, signature, studyArchivePath);
+    await rebuildDatabase(
+      archivePath,
+      databasePath,
+      signature,
+      studyArchivePath,
+      extendedArchivePath,
+    );
   }
 
   const db = new DatabaseSync(databasePath);

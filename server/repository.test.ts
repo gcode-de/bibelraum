@@ -27,8 +27,8 @@ before(() => {
       (2, 1, 2, 1, 'So wurden die Himmel und die Erde vollendet.');
     INSERT INTO study_sources (id, slug, translation_code, title, author)
       VALUES (1, 'test-kommentar', 'LUT', 'Testkommentar', 'Ada Beispiel');
-    INSERT INTO study_comments (id, source_id, text)
-      VALUES (1, 1, 'Eine Studienanmerkung zum ersten Vers.');
+    INSERT INTO study_comments (id, source_id, source_comment_id, heading, page, text)
+      VALUES (1, 1, 10, 'Zum Anfang', 12, 'Eine Studienanmerkung zum ersten Vers.');
     INSERT INTO study_comment_links (comment_id, book_ref_id, chapter, verse, source_url)
       VALUES (1, 1, 1, 1, 'https://example.test/comment');
   `);
@@ -53,7 +53,7 @@ test('loads a passage in the requested translation order', () => {
   assert.equal(passage?.translations[0].code, 'ELB');
   assert.equal(passage?.translations[1].verses[0].text, 'Am Anfang schuf Gott Himmel und Erde.');
   assert.equal(passage?.translations[1].verses[0].commentCount, 1);
-  assert.equal(passage?.translations[0].verses[0].commentCount, 0);
+  assert.equal(passage?.translations[0].verses[0].commentCount, 1);
   assert.deepEqual(passage?.next ? { ...passage.next } : null, {
     bookId: 1,
     chapter: 2,
@@ -61,12 +61,19 @@ test('loads a passage in the requested translation order', () => {
   });
 });
 
-test('loads study comments only for their translation and verse', () => {
-  const comments = repository.getStudyComments('LUT', 1, 1, 1);
+test('lists commentary sources and loads comments independently of the Bible translation', () => {
+  const sources = repository.getCommentaries();
+  assert.equal(sources.length, 1);
+  assert.equal(sources[0].slug, 'test-kommentar');
+  assert.equal(sources[0].verseLinkCount, 1);
+
+  const comments = repository.getStudyComments(1, 1, 1);
   assert.equal(comments.length, 1);
   assert.equal(comments[0].sourceTitle, 'Testkommentar');
+  assert.equal(comments[0].heading, 'Zum Anfang');
   assert.equal(comments[0].text, 'Eine Studienanmerkung zum ersten Vers.');
-  assert.equal(repository.getStudyComments('ELB', 1, 1, 1).length, 0);
+  assert.equal(repository.getChapterStudyComments(1, 1, 'test-kommentar')[0].verse, 1);
+  assert.equal(repository.getStudyComments(1, 1, 2).length, 0);
 });
 
 test('finds verses containing all search terms', () => {

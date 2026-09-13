@@ -19,6 +19,10 @@ export function createApp(repository: BibleRepository, staticDirectory?: string)
     response.json(repository.getTranslations());
   });
 
+  app.get('/api/commentaries', (_request, response) => {
+    response.json(repository.getCommentaries());
+  });
+
   app.get('/api/books', (request, response) => {
     const translation = String(request.query.translation ?? 'LUT').toUpperCase();
     const books = repository.getBooks(translation);
@@ -55,14 +59,27 @@ export function createApp(repository: BibleRepository, staticDirectory?: string)
     const bookId = positiveInteger(request.params.bookId);
     const chapter = positiveInteger(request.params.chapter);
     const verse = positiveInteger(request.params.verse);
-    const translation = String(request.query.translation ?? 'SLT').toUpperCase();
+    const source = String(request.query.source ?? '').trim() || undefined;
 
-    if (!bookId || !chapter || !verse || !translation) {
+    if (!bookId || !chapter || !verse) {
       response.status(400).json({ error: 'Ungültige Stellenangabe.' });
       return;
     }
 
-    response.json(repository.getStudyComments(translation, bookId, chapter, verse));
+    response.json(repository.getStudyComments(bookId, chapter, verse, source));
+  });
+
+  app.get('/api/comments/:bookId/:chapter', (request, response) => {
+    const bookId = positiveInteger(request.params.bookId);
+    const chapter = positiveInteger(request.params.chapter);
+    const source = String(request.query.source ?? '').trim();
+
+    if (!bookId || !chapter || !source) {
+      response.status(400).json({ error: 'Ungültige Kommentaranfrage.' });
+      return;
+    }
+
+    response.json(repository.getChapterStudyComments(bookId, chapter, source));
   });
 
   app.get('/api/search', (request, response) => {

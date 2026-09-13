@@ -975,7 +975,6 @@ export function App() {
                                 bookId={bookId}
                                 chapter={chapter}
                                 verse={item.verse}
-                                translationCode={translation.code}
                                 count={item.commentCount}
                               />
                             )}
@@ -1154,11 +1153,10 @@ function HomePage({
   );
 }
 
-function StudyCommentMarker({ bookId, chapter, verse, translationCode, count }: {
+function StudyCommentMarker({ bookId, chapter, verse, count }: {
   bookId: number;
   chapter: number;
   verse: number;
-  translationCode: string;
   count: number;
 }) {
   const [comments, setComments] = useState<StudyComment[] | null>(null);
@@ -1176,7 +1174,7 @@ function StudyCommentMarker({ bookId, chapter, verse, translationCode, count }: 
     setLoading(true);
     setError('');
     try {
-      setComments(await api.comments(bookId, chapter, verse, translationCode, controller.signal));
+      setComments(await api.comments(bookId, chapter, verse, undefined, controller.signal));
     } catch (reason) {
       if (reason instanceof Error && reason.name !== 'AbortError') {
         setError(reason.message);

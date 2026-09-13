@@ -38,12 +38,38 @@ export type Passage = {
 
 export type StudyComment = {
   id: number;
+  sourceSlug: string;
   sourceTitle: string;
+  author: string;
+  scope: string;
+  theologicalProfile: string;
+  sourceQuality: string;
+  mappingWarning: string;
+  copyright: string;
+  usageNotice: string;
+  heading: string;
+  page: number | null;
+  mappingQuality: string;
+  text: string;
+  sourceUrl: string;
+};
+
+export type ChapterStudyComment = StudyComment & { verse: number };
+
+export type CommentarySource = {
+  slug: string;
+  referenceTranslationCode: string;
+  title: string;
   author: string;
   copyright: string;
   usageNotice: string;
-  text: string;
+  scope: string;
+  theologicalProfile: string;
+  sourceQuality: string;
   sourceUrl: string;
+  mappingWarning: string;
+  sectionCount: number;
+  verseLinkCount: number;
 };
 
 export type SearchResult = {

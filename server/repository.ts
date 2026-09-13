@@ -10,12 +10,36 @@ type TranslationRow = {
 
 type StudyCommentRow = {
   id: number;
+  sourceSlug: string;
   sourceTitle: string;
+  author: string;
+  scope: string;
+  theologicalProfile: string;
+  sourceQuality: string;
+  mappingWarning: string;
+  copyright: string;
+  usageNotice: string;
+  heading: string;
+  page: number | null;
+  mappingQuality: string;
+  text: string;
+  sourceUrl: string;
+};
+
+type CommentarySourceRow = {
+  slug: string;
+  referenceTranslationCode: string;
+  title: string;
   author: string;
   copyright: string;
   usageNotice: string;
-  text: string;
+  scope: string;
+  theologicalProfile: string;
+  sourceQuality: string;
   sourceUrl: string;
+  mappingWarning: string;
+  sectionCount: number;
+  verseLinkCount: number;
 };
 
 export class BibleRepository {
@@ -83,22 +107,20 @@ export class BibleRepository {
       ORDER BY verse
     `);
 
-    const commentCountsStatement = this.db.prepare(`
-      SELECT links.verse, COUNT(*) AS commentCount
+    const commentCounts = new Map(
+      (this.db.prepare(`
+      SELECT links.verse, COUNT(DISTINCT comments.source_id) AS commentCount
       FROM study_comment_links links
       JOIN study_comments comments ON comments.id = links.comment_id
-      JOIN study_sources sources ON sources.id = comments.source_id
-      WHERE sources.translation_code = ? AND links.book_ref_id = ? AND links.chapter = ?
+      WHERE links.book_ref_id = ? AND links.chapter = ?
       GROUP BY links.verse
-    `);
+    `).all(bookId, chapter) as Array<{
+        verse: number;
+        commentCount: number;
+      }>).map((row) => [row.verse, row.commentCount]),
+    );
 
     const translations = translationRows.map((translation) => {
-      const commentCounts = new Map(
-        (commentCountsStatement.all(translation.code, bookId, chapter) as Array<{
-          verse: number;
-          commentCount: number;
-        }>).map((row) => [row.verse, row.commentCount]),
-      );
       const verses = versesStatement.all(translation.id, bookId, chapter) as Array<{
         verse: number;
         text: string;
@@ -118,29 +140,88 @@ export class BibleRepository {
     return { book, chapter, previous, next, translations };
   }
 
-  getStudyComments(
-    translationCode: string,
-    bookId: number,
-    chapter: number,
-    verse: number,
-  ) {
+  getCommentaries() {
     return this.db.prepare(`
-      SELECT comments.id,
-             sources.title AS sourceTitle,
+      SELECT sources.slug,
+             sources.translation_code AS referenceTranslationCode,
+             sources.title,
              sources.author,
              sources.copyright,
              sources.usage_notice AS usageNotice,
+             sources.scope,
+             sources.theological_profile AS theologicalProfile,
+             sources.source_quality AS sourceQuality,
+             sources.source_url AS sourceUrl,
+             sources.mapping_warning AS mappingWarning,
+             COUNT(DISTINCT comments.id) AS sectionCount,
+             COUNT(links.comment_id) AS verseLinkCount
+      FROM study_sources sources
+      LEFT JOIN study_comments comments ON comments.source_id = sources.id
+      LEFT JOIN study_comment_links links ON links.comment_id = comments.id
+      GROUP BY sources.id
+      ORDER BY sources.title COLLATE NOCASE
+    `).all() as CommentarySourceRow[];
+  }
+
+  getStudyComments(
+    bookId: number,
+    chapter: number,
+    verse: number,
+    sourceSlug?: string,
+  ) {
+    return this.db.prepare(`
+      SELECT comments.id,
+             sources.slug AS sourceSlug,
+             sources.title AS sourceTitle,
+             sources.author,
+             sources.scope,
+             sources.theological_profile AS theologicalProfile,
+             sources.source_quality AS sourceQuality,
+             sources.mapping_warning AS mappingWarning,
+             sources.copyright,
+             sources.usage_notice AS usageNotice,
+             comments.heading,
+             comments.page,
+             comments.mapping_quality AS mappingQuality,
              comments.text,
-             links.source_url AS sourceUrl
+             COALESCE(NULLIF(links.source_url, ''), sources.source_url) AS sourceUrl
       FROM study_comment_links links
       JOIN study_comments comments ON comments.id = links.comment_id
       JOIN study_sources sources ON sources.id = comments.source_id
-      WHERE sources.translation_code = ?
-        AND links.book_ref_id = ?
+      WHERE links.book_ref_id = ?
         AND links.chapter = ?
         AND links.verse = ?
-      ORDER BY sources.title COLLATE NOCASE, comments.id
-    `).all(translationCode, bookId, chapter, verse) as StudyCommentRow[];
+        AND (? IS NULL OR sources.slug = ?)
+      ORDER BY sources.title COLLATE NOCASE, comments.page, comments.id
+    `).all(bookId, chapter, verse, sourceSlug ?? null, sourceSlug ?? null) as StudyCommentRow[];
+  }
+
+  getChapterStudyComments(bookId: number, chapter: number, sourceSlug: string) {
+    return this.db.prepare(`
+      SELECT comments.id,
+             links.verse,
+             sources.slug AS sourceSlug,
+             sources.title AS sourceTitle,
+             sources.author,
+             sources.scope,
+             sources.theological_profile AS theologicalProfile,
+             sources.source_quality AS sourceQuality,
+             sources.mapping_warning AS mappingWarning,
+             sources.copyright,
+             sources.usage_notice AS usageNotice,
+             comments.heading,
+             comments.page,
+             comments.mapping_quality AS mappingQuality,
+             comments.text,
+             COALESCE(NULLIF(links.source_url, ''), sources.source_url) AS sourceUrl
+      FROM study_comment_links links
+      JOIN study_comments comments ON comments.id = links.comment_id
+      JOIN study_sources sources ON sources.id = comments.source_id
+      WHERE links.book_ref_id = ?
+        AND links.chapter = ?
+        AND sources.slug = ?
+      ORDER BY links.verse, comments.page, comments.id
+    `).all(bookId, chapter, sourceSlug) as Array<StudyCommentRow & { verse: number }>;
   }
 
   private getAdjacentChapter(
