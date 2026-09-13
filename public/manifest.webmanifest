@@ -1,0 +1,44 @@
+{
+  "id": "/",
+  "name": "Bibelraum",
+  "short_name": "Bibelraum",
+  "description": "Deutsche Bibelübersetzungen lesen, vergleichen und mit Studienkommentaren entdecken.",
+  "lang": "de-DE",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#f4f0e7",
+  "theme_color": "#9c432d",
+  "categories": ["books", "education", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Johannes 3 öffnen",
+      "short_name": "Johannes 3",
+      "url": "/?buch=43&kapitel=3&uebersetzung=LUT",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

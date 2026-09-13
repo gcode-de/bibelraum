@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#f4f0e7"/>
+  <circle cx="1060" cy="-20" r="330" fill="#f2ded6"/>
+  <circle cx="1100" cy="610" r="260" fill="none" stroke="#dcd7cb" stroke-width="2"/>
+  <rect x="86" y="84" width="112" height="112" rx="26" fill="#9c432d"/>
+  <path d="M142 117c-10-8-23-12-41-12v54c18 0 31 4 41 12 10-8 23-12 41-12v-54c-18 0-31 4-41 12Z" fill="#fffaf0"/>
+  <path d="M142 117v54" fill="none" stroke="#d7af72" stroke-linecap="round" stroke-width="4"/>
+  <text x="226" y="157" fill="#242720" font-family="Helvetica Neue,Arial,sans-serif" font-size="42" font-weight="600">Bibelraum</text>
+  <text x="86" y="335" fill="#242720" font-family="Georgia,serif" font-size="78" letter-spacing="-3">Die Bibel in</text>
+  <text x="86" y="420" fill="#9c432d" font-family="Georgia,serif" font-size="78" font-style="italic" letter-spacing="-3">deinem Rhythmus.</text>
+  <text x="90" y="500" fill="#77796f" font-family="Helvetica Neue,Arial,sans-serif" font-size="24">Lesen · Vergleichen · Verstehen</text>
+</svg>

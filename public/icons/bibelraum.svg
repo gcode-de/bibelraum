@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Bibelraum</title>
+  <rect width="512" height="512" rx="118" fill="#9c432d"/>
+  <path d="M256 151c-34-28-81-42-142-43v244c61 1 108 15 142 43 34-28 81-42 142-43V108c-61 1-108 15-142 43Z" fill="#fffaf0"/>
+  <path d="M256 151v244" fill="none" stroke="#d7af72" stroke-linecap="round" stroke-width="15"/>
+  <path d="M145 168c32 3 57 10 76 21M145 220c32 3 57 10 76 21M367 168c-32 3-57 10-76 21M367 220c-32 3-57 10-76 21" fill="none" stroke="#9c432d" stroke-linecap="round" stroke-width="12" opacity=".7"/>
+  <path d="M333 108v103l27-18 27 18V109c-19 2-37 5-54 10Z" fill="#d7af72"/>
+</svg>

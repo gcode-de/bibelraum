@@ -13,6 +13,8 @@ gemeinsame, für die Web-App optimierte SQLite-Datenbank importiert.
 - Suche innerhalb der gewählten Übersetzung
 - Navigation zum vorherigen und nächsten Kapitel, auch mit den Pfeiltasten
 - direkte, kopierbare Stellen-URLs
+- installierbare Progressive Web App mit Startseite und eigenem App-Icon
+- bereits geöffnete Kapitel bleiben über den Offline-Cache verfügbar
 - responsive Oberfläche für Desktop, Tablet und Smartphone
 - optionaler Dark Mode, dessen Auswahl lokal gespeichert wird
 - anpassbare Schriftart, Schriftgröße und Zeilenhöhe mit lokaler Speicherung

@@ -2,12 +2,12 @@ import {
   ArrowLeft,
   ArrowRight,
   BookMarked,
-  BookOpenText,
   Check,
   ChevronDown,
   CircleAlert,
   Copy,
   Columns3,
+  Download,
   FlaskConical,
   Highlighter,
   Library,
@@ -80,6 +80,11 @@ type SelectedVerse = {
   translationCode: string;
 };
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+};
+
 function loadMarkedVerses() {
   try {
     const saved = JSON.parse(localStorage.getItem('bibelraum.marked-verses') ?? '[]');
@@ -141,6 +146,7 @@ function getInitialExpertMode() {
 
 export function App() {
   const initial = useMemo(getInitialLocation, []);
+  const [homeOpen, setHomeOpen] = useState(() => !new URLSearchParams(window.location.search).has('buch'));
   const [translations, setTranslations] = useState<Translation[]>([]);
   const [selectedCodes, setSelectedCodes] = useState<string[]>([initial.translation]);
   const [recentTranslations, setRecentTranslations] = useState(() => loadRecentTranslations(initial.translation));
@@ -169,6 +175,11 @@ export function App() {
   const [markedVerses, setMarkedVerses] = useState<Record<string, HighlightColor>>(loadMarkedVerses);
   const [verseActionMessage, setVerseActionMessage] = useState('');
   const [verseColorMenuOpen, setVerseColorMenuOpen] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [appInstalled, setAppInstalled] = useState(() =>
+    window.matchMedia('(display-mode: standalone)').matches ||
+    Boolean((navigator as Navigator & { standalone?: boolean }).standalone),
+  );
   const [readerChromeVisible, setReaderChromeVisible] = useState(true);
   const [scrollProgress, setScrollProgress] = useState(0);
   const searchInput = useRef<HTMLInputElement>(null);
@@ -219,6 +230,25 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    function onBeforeInstallPrompt(event: Event) {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    }
+
+    function onAppInstalled() {
+      setInstallPrompt(null);
+      setAppInstalled(true);
+    }
+
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    window.addEventListener('appinstalled', onAppInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', onAppInstalled);
+    };
+  }, []);
+
+  useEffect(() => {
     if (sidebarOpen || translationOpen || readerSettingsOpen) {
       setReaderChromeVisible(true);
     }
@@ -263,7 +293,6 @@ export function App() {
     api.passage(bookId, chapter, selectedCodes, controller.signal)
       .then((data) => {
         setPassage(data);
-        document.title = `${data.book.name} ${chapter} · Bibelraum`;
       })
       .catch((reason: Error) => {
         if (reason.name !== 'AbortError') setError(reason.message);
@@ -271,6 +300,12 @@ export function App() {
       .finally(() => setLoading(false));
     return () => controller.abort();
   }, [bookId, chapter, selectedCodes]);
+
+  useEffect(() => {
+    document.title = homeOpen
+      ? 'Bibelraum · Die Bibel in deinem Rhythmus'
+      : `${passage?.book.name ?? currentBook?.name ?? 'Bibel'} ${chapter} · Bibelraum`;
+  }, [chapter, currentBook?.name, homeOpen, passage?.book.name]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -330,13 +365,17 @@ export function App() {
 
   useEffect(() => {
     localStorage.setItem('bibelraum.translation', primaryCode);
+    if (homeOpen) {
+      window.history.replaceState(null, '', '/');
+      return;
+    }
     const params = new URLSearchParams({
       buch: String(bookId),
       kapitel: String(chapter),
       uebersetzung: primaryCode,
     });
     window.history.replaceState(null, '', `?${params}`);
-  }, [bookId, chapter, primaryCode]);
+  }, [bookId, chapter, homeOpen, primaryCode]);
 
   useEffect(() => {
     if (loading || !passage || pendingScrollRestore.current <= 0) return;
@@ -646,14 +685,44 @@ export function App() {
     goTo(deltaX < 0 ? passage?.next ?? null : passage?.previous ?? null);
   }
 
+  async function installApp() {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    if (choice.outcome === 'accepted') setInstallPrompt(null);
+  }
+
+  if (homeOpen) {
+    return (
+      <HomePage
+        bookName={currentBook?.name ?? passage?.book.name ?? 'Johannes'}
+        chapter={chapter}
+        translationCode={primaryCode}
+        translationName={translations.find((item) => item.code === primaryCode)?.name ?? primaryCode}
+        translationCount={translations.length || 11}
+        excerpt={passage?.translations[0]?.verses.slice(0, 2).map((verse) => verse.text).join(' ') ?? ''}
+        theme={theme}
+        canInstall={Boolean(installPrompt) && !appInstalled}
+        appInstalled={appInstalled}
+        onContinue={() => setHomeOpen(false)}
+        onChoosePassage={() => {
+          setHomeOpen(false);
+          openBookPicker();
+        }}
+        onToggleTheme={() => setTheme((value) => value === 'dark' || value === 'black' ? 'light' : 'dark')}
+        onInstall={() => void installApp()}
+      />
+    );
+  }
+
   return (
     <div className={`app-shell ${readerChromeVisible ? '' : 'chrome-hidden'}`} style={readerStyle}>
       <header className="topbar">
         <button className="icon-button mobile-only" onClick={openBookPicker} aria-label="Bücher öffnen">
           <Menu size={20} />
         </button>
-        <a className="brand" href="/" aria-label="Bibelraum Startseite">
-          <span className="brand-mark"><BookOpenText size={20} strokeWidth={1.8} /></span>
+        <a className="brand" href="/" onClick={(event) => { event.preventDefault(); setHomeOpen(true); }} aria-label="Bibelraum Startseite">
+          <span className="brand-mark"><img src="/icons/bibelraum.svg" alt="" /></span>
           <span>Bibelraum</span>
         </a>
         <div className="topbar-rule" />
@@ -980,6 +1049,106 @@ export function App() {
         </div>
       )}
       {verseActionMessage && <span className="action-toast" role="status">{verseActionMessage}</span>}
+    </div>
+  );
+}
+
+function HomePage({
+  bookName,
+  chapter,
+  translationCode,
+  translationName,
+  translationCount,
+  excerpt,
+  theme,
+  canInstall,
+  appInstalled,
+  onContinue,
+  onChoosePassage,
+  onToggleTheme,
+  onInstall,
+}: {
+  bookName: string;
+  chapter: number;
+  translationCode: string;
+  translationName: string;
+  translationCount: number;
+  excerpt: string;
+  theme: ReaderTheme;
+  canInstall: boolean;
+  appInstalled: boolean;
+  onContinue: () => void;
+  onChoosePassage: () => void;
+  onToggleTheme: () => void;
+  onInstall: () => void;
+}) {
+  return (
+    <div className="home-shell">
+      <header className="home-topbar">
+        <a className="brand" href="/" aria-label="Bibelraum Startseite">
+          <span className="brand-mark"><img src="/icons/bibelraum.svg" alt="" /></span>
+          <span>Bibelraum</span>
+        </a>
+        <span className="home-topbar-note">Lesen · Verstehen · Bewahren</span>
+        <button className="icon-button" onClick={onToggleTheme} aria-label={theme === 'dark' || theme === 'black' ? 'Hellmodus aktivieren' : 'Dunkelmodus aktivieren'}>
+          {theme === 'dark' || theme === 'black' ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+      </header>
+
+      <main className="home-main">
+        <section className="home-intro" aria-labelledby="home-title">
+          <div className="home-copy">
+            <span className="eyebrow">Deine Bibel. Dein Raum.</span>
+            <h1 id="home-title">Die Bibel in deinem Rhythmus.</h1>
+            <p>Lies ungestört, vergleiche Übersetzungen und entdecke Hintergründe – an einem Ort, der sich nach dir richtet.</p>
+            <div className="home-actions">
+              <button className="primary-action" onClick={onContinue}>
+                Weiterlesen <ArrowRight size={18} />
+              </button>
+              <button className="secondary-action" onClick={onChoosePassage}>
+                <Search size={17} /> Stelle auswählen
+              </button>
+              {canInstall && (
+                <button className="secondary-action install-action" onClick={onInstall}>
+                  <Download size={17} /> App installieren
+                </button>
+              )}
+            </div>
+            {appInstalled && <span className="installed-note"><Check size={14} /> Als App installiert</span>}
+          </div>
+
+          <button className="continue-card" onClick={onContinue} aria-label={`Weiterlesen bei ${bookName} ${chapter}`}>
+            <span className="continue-card-topline">
+              <span><BookMarked size={15} /> Zuletzt gelesen</span>
+              <span className="translation-code">{translationCode}</span>
+            </span>
+            <strong>{bookName} <em>{chapter}</em></strong>
+            <span className="continue-translation">{translationName}</span>
+            {excerpt && <q>{excerpt}</q>}
+            <span className="continue-link">Kapitel öffnen <ArrowRight size={17} /></span>
+          </button>
+        </section>
+
+        <section className="home-features" aria-label="Bibelraum Funktionen">
+          <article>
+            <Library size={19} />
+            <div><strong>{translationCount} Übersetzungen</strong><span>Einzeln lesen oder parallel vergleichen</span></div>
+          </article>
+          <article>
+            <MessageSquareText size={19} />
+            <div><strong>Studienkommentare</strong><span>Hintergründe genau dort, wo du sie brauchst</span></div>
+          </article>
+          <article>
+            <Download size={19} />
+            <div><strong>Wie eine echte App</strong><span>Auf dem Home-Bildschirm, ohne Konto</span></div>
+          </article>
+        </section>
+      </main>
+
+      <footer className="home-footer">
+        <span>Bibelraum</span>
+        <span>Ein ruhiger Ort für Gottes Wort.</span>
+      </footer>
     </div>
   );
 }
