@@ -252,7 +252,7 @@ async function rebuildDatabase(
   await mkdir(path.dirname(databasePath), { recursive: true });
   const importPath = `${databasePath}.importing`;
   await rm(importPath, { force: true });
-  const tempDirectory = await mkdtemp(path.join(tmpdir(), 'bibelraum-'));
+  const tempDirectory = await mkdtemp(path.join(tmpdir(), 'das-wort-'));
 
   try {
     const modules = await extractModules(archivePath, tempDirectory, 'bible');

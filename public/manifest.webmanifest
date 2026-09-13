@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Bibelraum",
-  "short_name": "Bibelraum",
+  "name": "Das Wort",
+  "short_name": "Das Wort",
   "description": "Deutsche Bibelübersetzungen lesen, vergleichen und mit Studienkommentaren entdecken.",
   "lang": "de-DE",
   "dir": "ltr",

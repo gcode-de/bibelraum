@@ -13,6 +13,6 @@ export const config = {
     ? path.resolve(process.env.STUDY_ARCHIVE)
     : undefined,
   databasePath: path.resolve(
-    process.env.BIBLE_DB ?? path.join(projectRoot, 'data', 'bibelraum.sqlite'),
+    process.env.BIBLE_DB ?? path.join(projectRoot, 'data', 'das-wort.sqlite'),
   ),
 };

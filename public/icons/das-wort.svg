@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Das Wort</title>
+  <rect width="512" height="512" rx="118" fill="#9c432d"/>
+  <path d="M256 145c-36-27-83-40-142-41v248c59 1 106 14 142 41 36-27 83-40 142-41V104c-59 1-106 14-142 41Z" fill="#fffaf0"/>
+  <path d="M256 145v248" fill="none" stroke="#d7af72" stroke-linecap="round" stroke-width="15"/>
+  <path d="m143 170 38 126 75-78 75 78 38-126" fill="none" stroke="#9c432d" stroke-linecap="round" stroke-linejoin="round" stroke-width="15" opacity=".78"/>
+  <path d="M337 105v99l24-16 24 16v-98c-17 2-33 5-48 9Z" fill="#d7af72"/>
+</svg>

@@ -1,6 +1,6 @@
-# Bibelraum
+# Das Wort
 
-Bibelraum ist eine vollständig lokale Leseoberfläche für die deutschen
+Das Wort ist eine vollständig lokale Leseoberfläche für die deutschen
 OpenLP-Bibelmodule aus `OpenLP-Bibeln-DE-2026-09-07.zip`. Die Originaldateien im
 Archiv bleiben unverändert. Beim ersten Start werden alle Übersetzungen in eine
 gemeinsame, für die Web-App optimierte SQLite-Datenbank importiert.
@@ -32,9 +32,9 @@ npm run build
 npm start
 ```
 
-Danach ist Bibelraum unter [http://localhost:4174](http://localhost:4174)
+Danach ist Das Wort unter [http://localhost:4174](http://localhost:4174)
 erreichbar. Der erste Start dauert einige Sekunden, weil die App das Archiv
-einmalig einliest. Die erzeugte Datei liegt unter `data/bibelraum.sqlite`
+einmalig einliest. Die erzeugte Datei liegt unter `data/das-wort.sqlite`
 und wird nicht in Git aufgenommen. Ändert sich das Archiv, wird sie beim nächsten
 Start automatisch neu aufgebaut.
 
@@ -54,7 +54,7 @@ Archiv, Datenbank und Port können über Umgebungsvariablen gesetzt werden:
 ```bash
 BIBLE_ARCHIVE="/pfad/meine-bibeln.zip" \
 STUDY_ARCHIVE="/pfad/MacArthur-Studienbibel-SLT2000-OpenLP-2026-09-12.zip" \
-BIBLE_DB="/pfad/bibelraum.sqlite" \
+BIBLE_DB="/pfad/das-wort.sqlite" \
 PORT=8080 \
 npm start
 ```

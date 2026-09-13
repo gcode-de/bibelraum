@@ -18,7 +18,7 @@ try {
     : undefined;
   const app = createApp(repository, staticDirectory);
   const server = app.listen(config.port, () => {
-    console.log(`Bibelraum läuft auf http://localhost:${config.port}`);
+    console.log(`Das Wort läuft auf http://localhost:${config.port}`);
   });
 
   function shutdown() {

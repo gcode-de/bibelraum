@@ -1,5 +1,5 @@
 [Unit]
-Description=Bibelraum Bible reader
+Description=Das Wort Bible reader
 Wants=network-online.target
 After=network-online.target
 

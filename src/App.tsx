@@ -35,6 +35,7 @@ import {
   readerFontStacks,
 } from './ReaderSettings';
 import type { HighlightColor, ReaderTheme } from './ReaderSettings';
+import { readAppStorage, writeAppStorage } from './storage';
 import type { Book, Passage, PassageLocation, SearchResult, StudyComment, Translation } from './types';
 
 const DEFAULT_BOOK = 43;
@@ -51,7 +52,7 @@ type ReadingState = {
 
 function loadReadingState(): Partial<ReadingState> {
   try {
-    const saved = JSON.parse(localStorage.getItem('bibelraum.reading-state') ?? '{}');
+    const saved = JSON.parse(readAppStorage('reading-state') ?? '{}');
     return saved && typeof saved === 'object' ? saved as Partial<ReadingState> : {};
   } catch {
     return {};
@@ -68,7 +69,7 @@ function getInitialLocation() {
     bookId: hasUrlLocation ? book : Number(saved.bookId) || DEFAULT_BOOK,
     chapter: Number.isInteger(chapter) && chapter > 0 ? chapter : Number(saved.chapter) || DEFAULT_CHAPTER,
     translation: params.get('uebersetzung')?.toUpperCase() ||
-      saved.translation || localStorage.getItem('bibelraum.translation') || DEFAULT_TRANSLATION,
+      saved.translation || readAppStorage('translation') || DEFAULT_TRANSLATION,
     verse: Number(params.get('vers')?.split(',')[0]) || null,
     scrollY: hasUrlLocation ? 0 : Math.max(0, Number(saved.scrollY) || 0),
   };
@@ -87,7 +88,7 @@ type BeforeInstallPromptEvent = Event & {
 
 function loadMarkedVerses() {
   try {
-    const saved = JSON.parse(localStorage.getItem('bibelraum.marked-verses') ?? '[]');
+    const saved = JSON.parse(readAppStorage('marked-verses') ?? '[]');
     if (Array.isArray(saved)) {
       return Object.fromEntries(
         saved.filter((item): item is string => typeof item === 'string').map((key) => [key, 'yellow']),
@@ -108,7 +109,7 @@ function loadMarkedVerses() {
 
 function loadRecentTranslations(initialCode: string) {
   try {
-    const saved = JSON.parse(localStorage.getItem('bibelraum.recent-translations') ?? '[]');
+    const saved = JSON.parse(readAppStorage('recent-translations') ?? '[]');
     const codes = Array.isArray(saved) ? saved.filter((item): item is string => typeof item === 'string') : [];
     return [initialCode, ...codes.filter((code) => code !== initialCode)].slice(0, 4);
   } catch {
@@ -116,9 +117,9 @@ function loadRecentTranslations(initialCode: string) {
   }
 }
 
-function loadNumberList(key: string) {
+function loadNumberList(name: string) {
   try {
-    const saved = JSON.parse(localStorage.getItem(key) ?? '[]');
+    const saved = JSON.parse(readAppStorage(name) ?? '[]');
     return Array.isArray(saved) ? saved.filter((item): item is number => Number.isInteger(item)) : [];
   } catch {
     return [];
@@ -127,7 +128,7 @@ function loadNumberList(key: string) {
 
 function loadBookProgress() {
   try {
-    const saved = JSON.parse(localStorage.getItem('bibelraum.book-progress') ?? '{}');
+    const saved = JSON.parse(readAppStorage('book-progress') ?? '{}');
     return saved && typeof saved === 'object' ? saved as Record<number, number> : {};
   } catch {
     return {};
@@ -135,13 +136,13 @@ function loadBookProgress() {
 }
 
 function getInitialTheme() {
-  const saved = localStorage.getItem('bibelraum.theme');
+  const saved = readAppStorage('theme');
   if (saved === 'dark' || saved === 'light' || saved === 'sepia' || saved === 'gray' || saved === 'black') return saved;
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
 function getInitialExpertMode() {
-  return localStorage.getItem('bibelraum.expert-mode') === 'true';
+  return readAppStorage('expert-mode') === 'true';
 }
 
 export function App() {
@@ -160,7 +161,7 @@ export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileExpandedBookId, setMobileExpandedBookId] = useState(initial.bookId);
   const [bookFilter, setBookFilter] = useState('');
-  const [recentBookIds, setRecentBookIds] = useState(() => loadNumberList('bibelraum.recent-books'));
+  const [recentBookIds, setRecentBookIds] = useState(() => loadNumberList('recent-books'));
   const [bookProgress, setBookProgress] = useState(loadBookProgress);
   const [translationOpen, setTranslationOpen] = useState(false);
   const [expertMode, setExpertMode] = useState(getInitialExpertMode);
@@ -303,13 +304,13 @@ export function App() {
 
   useEffect(() => {
     document.title = homeOpen
-      ? 'Bibelraum · Die Bibel in deinem Rhythmus'
-      : `${passage?.book.name ?? currentBook?.name ?? 'Bibel'} ${chapter} · Bibelraum`;
+      ? 'Das Wort · Die Bibel in deinem Rhythmus'
+      : `${passage?.book.name ?? currentBook?.name ?? 'Bibel'} ${chapter} · Das Wort`;
   }, [chapter, currentBook?.name, homeOpen, passage?.book.name]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    localStorage.setItem('bibelraum.theme', theme);
+    writeAppStorage('theme', theme);
     document.querySelector('meta[name="theme-color"]')?.setAttribute(
       'content',
       ({ light: '#f4f0e7', sepia: '#eee3ce', gray: '#e8e8e5', dark: '#171816', black: '#000000' })[theme],
@@ -322,11 +323,11 @@ export function App() {
   }, [readerSettings.accent, readerSettings.highlight]);
 
   useEffect(() => {
-    localStorage.setItem('bibelraum.reader-settings', JSON.stringify(readerSettings));
+    writeAppStorage('reader-settings', JSON.stringify(readerSettings));
   }, [readerSettings]);
 
   useEffect(() => {
-    localStorage.setItem('bibelraum.marked-verses', JSON.stringify(markedVerses));
+    writeAppStorage('marked-verses', JSON.stringify(markedVerses));
   }, [markedVerses]);
 
   useEffect(() => {
@@ -334,7 +335,7 @@ export function App() {
   }, [selectedVerses.length]);
 
   useEffect(() => {
-    localStorage.setItem('bibelraum.recent-translations', JSON.stringify(recentTranslations));
+    writeAppStorage('recent-translations', JSON.stringify(recentTranslations));
   }, [recentTranslations]);
 
   useEffect(() => {
@@ -343,11 +344,11 @@ export function App() {
   }, [bookId, chapter]);
 
   useEffect(() => {
-    localStorage.setItem('bibelraum.recent-books', JSON.stringify(recentBookIds));
+    writeAppStorage('recent-books', JSON.stringify(recentBookIds));
   }, [recentBookIds]);
 
   useEffect(() => {
-    localStorage.setItem('bibelraum.book-progress', JSON.stringify(bookProgress));
+    writeAppStorage('book-progress', JSON.stringify(bookProgress));
   }, [bookProgress]);
 
   useEffect(() => {
@@ -360,11 +361,11 @@ export function App() {
   }, [readerSettingsOpen, translationOpen]);
 
   useEffect(() => {
-    localStorage.setItem('bibelraum.expert-mode', String(expertMode));
+    writeAppStorage('expert-mode', String(expertMode));
   }, [expertMode]);
 
   useEffect(() => {
-    localStorage.setItem('bibelraum.translation', primaryCode);
+    writeAppStorage('translation', primaryCode);
     if (homeOpen) {
       window.history.replaceState(null, '', '/');
       return;
@@ -390,7 +391,7 @@ export function App() {
     let saveTimer = 0;
 
     function persistPosition() {
-      localStorage.setItem('bibelraum.reading-state', JSON.stringify({
+      writeAppStorage('reading-state', JSON.stringify({
         bookId,
         chapter,
         translation: primaryCode,
@@ -721,9 +722,9 @@ export function App() {
         <button className="icon-button mobile-only" onClick={openBookPicker} aria-label="Bücher öffnen">
           <Menu size={20} />
         </button>
-        <a className="brand" href="/" onClick={(event) => { event.preventDefault(); setHomeOpen(true); }} aria-label="Bibelraum Startseite">
-          <span className="brand-mark"><img src="/icons/bibelraum.svg" alt="" /></span>
-          <span>Bibelraum</span>
+        <a className="brand" href="/" onClick={(event) => { event.preventDefault(); setHomeOpen(true); }} aria-label="Das Wort Startseite">
+          <span className="brand-mark"><img src="/icons/das-wort.svg" alt="" /></span>
+          <span>Das Wort</span>
         </a>
         <div className="topbar-rule" />
         <span className="topbar-kicker">Lokal lesen</span>
@@ -1085,9 +1086,9 @@ function HomePage({
   return (
     <div className="home-shell">
       <header className="home-topbar">
-        <a className="brand" href="/" aria-label="Bibelraum Startseite">
-          <span className="brand-mark"><img src="/icons/bibelraum.svg" alt="" /></span>
-          <span>Bibelraum</span>
+        <a className="brand" href="/" aria-label="Das Wort Startseite">
+          <span className="brand-mark"><img src="/icons/das-wort.svg" alt="" /></span>
+          <span>Das Wort</span>
         </a>
         <span className="home-topbar-note">Lesen · Verstehen · Bewahren</span>
         <button className="icon-button" onClick={onToggleTheme} aria-label={theme === 'dark' || theme === 'black' ? 'Hellmodus aktivieren' : 'Dunkelmodus aktivieren'}>
@@ -1129,7 +1130,7 @@ function HomePage({
           </button>
         </section>
 
-        <section className="home-features" aria-label="Bibelraum Funktionen">
+        <section className="home-features" aria-label="Funktionen von Das Wort">
           <article>
             <Library size={19} />
             <div><strong>{translationCount} Übersetzungen</strong><span>Einzeln lesen oder parallel vergleichen</span></div>
@@ -1146,7 +1147,7 @@ function HomePage({
       </main>
 
       <footer className="home-footer">
-        <span>Bibelraum</span>
+        <span>Das Wort</span>
         <span>Ein ruhiger Ort für Gottes Wort.</span>
       </footer>
     </div>

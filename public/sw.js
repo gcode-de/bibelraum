@@ -1,9 +1,9 @@
-const SHELL_CACHE = 'bibelraum-shell-v1';
-const CONTENT_CACHE = 'bibelraum-content-v1';
+const SHELL_CACHE = 'das-wort-shell-v2';
+const CONTENT_CACHE = 'das-wort-content-v2';
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest',
-  '/icons/bibelraum.svg',
+  '/icons/das-wort.svg',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/apple-touch-icon.png',

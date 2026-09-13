@@ -1,4 +1,5 @@
 import { ALargeSmall, AlignJustify, AlignLeft, Check, Minus, Plus, RotateCcw, X } from 'lucide-react';
+import { readAppStorage } from './storage';
 
 export type ReaderSettings = {
   fontSize: number;
@@ -59,7 +60,7 @@ const themeChoices: Array<{ id: ReaderTheme; name: string }> = [
 
 export function loadReaderSettings(): ReaderSettings {
   try {
-    const saved = JSON.parse(localStorage.getItem('bibelraum.reader-settings') ?? '{}') as Partial<ReaderSettings>;
+    const saved = JSON.parse(readAppStorage('reader-settings') ?? '{}') as Partial<ReaderSettings>;
     const fontFamily = saved.fontFamily && Object.hasOwn(readerFontStacks, saved.fontFamily)
       ? saved.fontFamily
       : defaultReaderSettings.fontFamily;
