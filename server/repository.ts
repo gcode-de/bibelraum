@@ -3,6 +3,7 @@ import type { DatabaseSync } from 'node:sqlite';
 type TranslationRow = {
   code: string;
   name: string;
+  languageCode: 'de' | 'en';
   copyright: string;
   permissions: string;
   verseCount: number;
@@ -29,6 +30,7 @@ type StudyCommentRow = {
 type CommentarySourceRow = {
   slug: string;
   referenceTranslationCode: string;
+  languageCode: 'de' | 'en';
   title: string;
   author: string;
   copyright: string;
@@ -47,7 +49,8 @@ export class BibleRepository {
 
   getTranslations() {
     return this.db.prepare(`
-      SELECT t.code, t.name, t.copyright, t.permissions, COUNT(v.verse) AS verseCount
+      SELECT t.code, t.name, t.language_code AS languageCode,
+             t.copyright, t.permissions, COUNT(v.verse) AS verseCount
       FROM translations t
       LEFT JOIN verses v ON v.translation_id = t.id
       GROUP BY t.id
@@ -144,6 +147,7 @@ export class BibleRepository {
     return this.db.prepare(`
       SELECT sources.slug,
              sources.translation_code AS referenceTranslationCode,
+             sources.language_code AS languageCode,
              sources.title,
              sources.author,
              sources.copyright,

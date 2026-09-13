@@ -20,9 +20,12 @@ const translationCodes: Record<string, string> = {
   'Zürcher Bibel': 'ZB',
   'Die Bibel in deutscher Fassung (Jantzen/Jettel)': 'BDF',
   'Neue Genfer Übersetzung (veröffentlichte Bücher)': 'NGÜ',
+  'Berean Standard Bible': 'BSB',
+  'World English Bible': 'WEB',
+  'Literal Standard Version': 'LSV',
 };
 
-const DATABASE_SCHEMA_VERSION = '3';
+const DATABASE_SCHEMA_VERSION = '4';
 
 export function createSchema(db: DatabaseSync) {
   db.exec(`
@@ -35,6 +38,7 @@ export function createSchema(db: DatabaseSync) {
       id INTEGER PRIMARY KEY,
       code TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
+      language_code TEXT NOT NULL DEFAULT 'de',
       copyright TEXT NOT NULL DEFAULT '',
       permissions TEXT NOT NULL DEFAULT ''
     );
@@ -61,6 +65,7 @@ export function createSchema(db: DatabaseSync) {
       id INTEGER PRIMARY KEY,
       slug TEXT NOT NULL UNIQUE,
       translation_code TEXT NOT NULL,
+      language_code TEXT NOT NULL DEFAULT 'de',
       title TEXT NOT NULL,
       author TEXT NOT NULL DEFAULT '',
       copyright TEXT NOT NULL DEFAULT '',
@@ -175,6 +180,24 @@ function slugify(value: string) {
     .replace(/^-|-$/g, '') || 'studienkommentar';
 }
 
+function resolveTranslationCode(sourceName: string) {
+  if (/\bBSB reference text\b/i.test(sourceName)) return 'BSB';
+  return translationCodes[sourceName] ?? sourceName.toUpperCase().replace(/[^A-Z0-9ÄÖÜ]/g, '');
+}
+
+function resolveLanguageCode(metadata: Record<string, string>) {
+  return metadata.language_id === '10' ? 'en' : 'de';
+}
+
+function readStudySourceValue(db: DatabaseSync, column: string) {
+  if (!sourceTableExists(db, 'study_source')) return '';
+  const columns = sourceColumnNames(db, 'study_source');
+  if (!columns.has(column)) return '';
+  return ((db.prepare(`
+    SELECT GROUP_CONCAT(DISTINCT ${column}) AS value FROM source.study_source
+  `).get() as { value?: string } | undefined)?.value ?? '');
+}
+
 function readSourceMetadata(db: DatabaseSync) {
   const rows = db.prepare('SELECT key, value FROM source.metadata').all() as Array<{
     key: string;
@@ -188,7 +211,7 @@ function importModule(db: DatabaseSync, modulePath: string) {
   try {
     const metadata = readSourceMetadata(db);
     const sourceName = metadata.name || path.basename(modulePath, '.sqlite');
-    const code = translationCodes[sourceName] ?? sourceName.toUpperCase().replace(/[^A-Z0-9ÄÖÜ]/g, '');
+    const code = resolveTranslationCode(sourceName);
 
     if (db.prepare('SELECT 1 FROM translations WHERE code = ?').get(code)) {
       return code;
@@ -196,9 +219,9 @@ function importModule(db: DatabaseSync, modulePath: string) {
 
     db.exec('BEGIN');
     const translationResult = db.prepare(`
-      INSERT INTO translations (code, name, copyright, permissions)
-      VALUES (?, ?, ?, ?)
-    `).run(code, sourceName, metadata.copyright ?? '', metadata.permissions ?? '');
+      INSERT INTO translations (code, name, language_code, copyright, permissions)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(code, sourceName, resolveLanguageCode(metadata), metadata.copyright ?? '', metadata.permissions ?? '');
     const translationId = Number(translationResult.lastInsertRowid);
 
     db.prepare(`
@@ -235,19 +258,16 @@ function importStudyModule(db: DatabaseSync, modulePath: string) {
     const bibleMetadata = readSourceMetadata(db);
     const title = metadata.study_title || metadata.title || 'Studienkommentar';
     const sourceName = bibleMetadata.name || 'Schlachter 2000';
-    const translationCode = translationCodes[sourceName] ?? 'SLT';
+    const translationCode = resolveTranslationCode(sourceName);
     const copyright = [
       metadata.copyright_original,
       metadata.copyright_german,
       metadata.copyright_bible,
     ].filter(Boolean).join('\n');
-    const usageNotice = metadata.usage_notice || metadata.rights || '';
-    const sourceUrl = metadata.source_url || metadata.source_pdf || metadata.source_notes || '';
-    const sourceQuality = sourceTableExists(db, 'study_source')
-      ? ((db.prepare(`
-          SELECT GROUP_CONCAT(DISTINCT source_quality) AS quality FROM source.study_source
-        `).get() as { quality?: string } | undefined)?.quality ?? '')
-      : '';
+    const sourceLicense = readStudySourceValue(db, 'license');
+    const usageNotice = metadata.usage_notice || metadata.rights || metadata.license || sourceLicense || '';
+    const sourceUrl = metadata.source_url || metadata.source_pdf || metadata.source_notes || readStudySourceValue(db, 'source_url');
+    const sourceQuality = readStudySourceValue(db, 'source_quality');
     const commentColumns = sourceColumnNames(db, 'study_comment');
     const linkColumns = sourceColumnNames(db, 'study_comment_link');
     const slug = slugify(`${title}-${metadata.study_author || metadata.author || translationCode}`);
@@ -255,16 +275,17 @@ function importStudyModule(db: DatabaseSync, modulePath: string) {
     db.exec('BEGIN');
     const sourceResult = db.prepare(`
       INSERT INTO study_sources (
-        slug, translation_code, title, author, copyright, usage_notice,
+        slug, translation_code, language_code, title, author, copyright, usage_notice,
         scope, theological_profile, source_quality, source_url, mapping_warning
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       slug,
       translationCode,
+      resolveLanguageCode(bibleMetadata),
       title,
       metadata.study_author || metadata.author || '',
-      copyright || metadata.rights || '',
+      copyright || metadata.rights || metadata.license || sourceLicense || '',
       usageNotice,
       metadata.scope || '',
       metadata.theological_profile || '',
@@ -314,7 +335,7 @@ async function rebuildDatabase(
   databasePath: string,
   signature: string,
   studyArchivePath?: string,
-  extendedArchivePath?: string,
+  additionalArchivePaths: string[] = [],
 ) {
   await mkdir(path.dirname(databasePath), { recursive: true });
   const importPath = `${databasePath}.importing`;
@@ -326,10 +347,11 @@ async function rebuildDatabase(
     const studyArchiveModules = studyArchivePath
       ? await extractModules(studyArchivePath, tempDirectory, 'study')
       : [];
-    const extendedModules = extendedArchivePath
-      ? await extractModules(extendedArchivePath, tempDirectory, 'extended')
-      : [];
-    const allModules = [...primaryModules, ...studyArchiveModules, ...extendedModules]
+    const additionalModules = (await Promise.all(
+      additionalArchivePaths.map((additionalArchivePath, index) =>
+        extractModules(additionalArchivePath, tempDirectory, `additional-${index}`)),
+    )).flat();
+    const allModules = [...primaryModules, ...studyArchiveModules, ...additionalModules]
       .map((modulePath) => ({ modulePath, kind: moduleKind(modulePath) }));
     const modules = allModules.filter(({ kind }) => kind === 'bible').map(({ modulePath }) => modulePath);
     const studyModules = allModules.filter(({ kind }) => kind === 'study').map(({ modulePath }) => modulePath);
@@ -369,7 +391,7 @@ export async function openBibleDatabase(
   archivePath: string,
   databasePath: string,
   studyArchivePath?: string,
-  extendedArchivePath?: string,
+  additionalArchivePaths: string[] = [],
 ) {
   let bibleSignature: string | undefined;
   try {
@@ -387,17 +409,17 @@ export async function openBibleDatabase(
     }
   }
 
-  let extendedSignature: string | undefined;
-  if (extendedArchivePath) {
+  const additionalSignatures: string[] = [];
+  for (const additionalArchivePath of additionalArchivePaths) {
     try {
-      extendedSignature = await archiveSignature(extendedArchivePath);
+      additionalSignatures.push(await archiveSignature(additionalArchivePath));
     } catch {
-      throw new Error(`Erweitertes Bibelarchiv nicht gefunden: ${extendedArchivePath}`);
+      throw new Error(`Zusätzliches Bibelarchiv nicht gefunden: ${additionalArchivePath}`);
     }
   }
 
   const signature = bibleSignature
-    ? `${DATABASE_SCHEMA_VERSION}|bible:${bibleSignature}|study:${studySignature ?? 'none'}|extended:${extendedSignature ?? 'none'}`
+    ? `${DATABASE_SCHEMA_VERSION}|bible:${bibleSignature}|study:${studySignature ?? 'none'}|additional:${additionalSignatures.join(',') || 'none'}`
     : undefined;
 
   let isCurrent = false;
@@ -422,7 +444,7 @@ export async function openBibleDatabase(
       databasePath,
       signature,
       studyArchivePath,
-      extendedArchivePath,
+      additionalArchivePaths,
     );
   }
 

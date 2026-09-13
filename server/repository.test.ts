@@ -14,6 +14,7 @@ before(() => {
     INSERT INTO translations (id, code, name) VALUES
       (1, 'LUT', 'Luther 2017'),
       (2, 'ELB', 'Elberfelder');
+    UPDATE translations SET language_code = 'en' WHERE code = 'ELB';
     INSERT INTO books (ref_id, testament, position) VALUES
       (1, 1, 1), (2, 1, 2);
     INSERT INTO book_names (translation_id, book_ref_id, name) VALUES
@@ -27,6 +28,7 @@ before(() => {
       (2, 1, 2, 1, 'So wurden die Himmel und die Erde vollendet.');
     INSERT INTO study_sources (id, slug, translation_code, title, author)
       VALUES (1, 'test-kommentar', 'LUT', 'Testkommentar', 'Ada Beispiel');
+    UPDATE study_sources SET language_code = 'en' WHERE id = 1;
     INSERT INTO study_comments (id, source_id, source_comment_id, heading, page, text)
       VALUES (1, 1, 10, 'Zum Anfang', 12, 'Eine Studienanmerkung zum ersten Vers.');
     INSERT INTO study_comment_links (comment_id, book_ref_id, chapter, verse, source_url)
@@ -38,7 +40,9 @@ before(() => {
 after(() => database.close());
 
 test('lists translations and books', () => {
-  assert.equal(repository.getTranslations().length, 2);
+  const translations = repository.getTranslations();
+  assert.equal(translations.length, 2);
+  assert.equal(translations.find((translation) => translation.code === 'ELB')?.languageCode, 'en');
   assert.deepEqual({ ...repository.getBooks('LUT')[0] }, {
     id: 1,
     name: '1. Mose',
@@ -65,6 +69,7 @@ test('lists commentary sources and loads comments independently of the Bible tra
   const sources = repository.getCommentaries();
   assert.equal(sources.length, 1);
   assert.equal(sources[0].slug, 'test-kommentar');
+  assert.equal(sources[0].languageCode, 'en');
   assert.equal(sources[0].verseLinkCount, 1);
 
   const comments = repository.getStudyComments(1, 1, 1);

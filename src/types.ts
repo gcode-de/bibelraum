@@ -1,6 +1,7 @@
 export type Translation = {
   code: string;
   name: string;
+  languageCode: 'de' | 'en';
   copyright: string;
   permissions: string;
   verseCount: number;
@@ -59,6 +60,7 @@ export type ChapterStudyComment = StudyComment & { verse: number };
 export type CommentarySource = {
   slug: string;
   referenceTranslationCode: string;
+  languageCode: 'de' | 'en';
   title: string;
   author: string;
   copyright: string;

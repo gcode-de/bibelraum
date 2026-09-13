@@ -10,7 +10,7 @@ try {
     config.archivePath,
     config.databasePath,
     config.studyArchivePath,
-    config.extendedArchivePath,
+    config.additionalArchivePaths,
   );
   const repository = new BibleRepository(database);
   const builtClient = path.join(config.projectRoot, 'dist');
