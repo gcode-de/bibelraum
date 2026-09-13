@@ -10,15 +10,17 @@ services:
       BIBLE_ARCHIVE: /app/input/bibles.zip
       STUDY_ARCHIVE: /app/input/study-bible.zip
       EXTENDED_ARCHIVE: /app/input/extended-study.zip
+      ENGLISH_ARCHIVE: /app/input/english-study.zip
       BIBLE_DB: /app/data/bibelraum.sqlite
     volumes:
       - "${BIBLE_ARCHIVE_PATH:-/opt/bibelraum/OpenLP-Bibeln-DE-2026-09-07.zip}:/app/input/bibles.zip:ro"
       - "${STUDY_ARCHIVE_PATH:-/opt/bibelraum/MacArthur-Studienbibel-SLT2000-OpenLP-2026-09-12.zip}:/app/input/study-bible.zip:ro"
       - "${EXTENDED_ARCHIVE_PATH:-/opt/bibelraum/Bibeln-und-Studienkommentare-OpenLP.zip}:/app/input/extended-study.zip:ro"
+      - "${ENGLISH_ARCHIVE_PATH:-/opt/bibelraum/English-Bibles-and-Commentaries-OpenLP.zip}:/app/input/english-study.zip:ro"
       - bibelraum-data:/app/data
     read_only: true
     tmpfs:
-      - /tmp:size=768m,mode=1777
+      - /tmp:size=1536m,mode=1777
     security_opt:
       - no-new-privileges:true
     healthcheck:
