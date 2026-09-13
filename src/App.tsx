@@ -40,6 +40,7 @@ import type { Book, Passage, PassageLocation, SearchResult, StudyComment, Transl
 const DEFAULT_BOOK = 43;
 const DEFAULT_CHAPTER = 3;
 const DEFAULT_TRANSLATION = 'LUT';
+const PUBLIC_ORIGIN = 'https://bibel.samuelgesang.de';
 
 type ReadingState = {
   bookId: number;
@@ -174,6 +175,7 @@ export function App() {
   const lastScrollY = useRef(window.scrollY);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const pendingScrollRestore = useRef(initial.scrollY);
+  const verseActionMessageTimer = useRef<number | null>(null);
 
   const primaryCode = selectedCodes[0];
   const currentBook = books.find((book) => book.id === bookId);
@@ -387,6 +389,12 @@ export function App() {
     return () => window.clearTimeout(timeout);
   }, [highlightedVerse, loading, passage]);
 
+  useEffect(() => () => {
+    if (verseActionMessageTimer.current !== null) {
+      window.clearTimeout(verseActionMessageTimer.current);
+    }
+  }, []);
+
   useEffect(() => {
     if (!sidebarOpen) return;
     const previousOverflow = document.body.style.overflow;
@@ -510,6 +518,35 @@ export function App() {
     return selectedVerses.map((verse) => `${verseReference(verse)}\n${verse.text}`).join('\n\n');
   }
 
+  function selectedVerseUrl() {
+    const translationCodes = new Set(selectedVerses.map((verse) => verse.translationCode));
+    const translationCode = translationCodes.size === 1
+      ? selectedVerses[0]?.translationCode ?? primaryCode
+      : primaryCode;
+    const url = new URL('/', PUBLIC_ORIGIN);
+    url.searchParams.set('buch', String(bookId));
+    url.searchParams.set('kapitel', String(chapter));
+    url.searchParams.set('uebersetzung', translationCode);
+    url.searchParams.set('vers', [...new Set(selectedVerses.map((verse) => verse.verse))].sort((a, b) => a - b).join(','));
+    return url;
+  }
+
+  function showVerseActionMessage(message: string) {
+    if (verseActionMessageTimer.current !== null) {
+      window.clearTimeout(verseActionMessageTimer.current);
+    }
+    setVerseActionMessage(message);
+    verseActionMessageTimer.current = window.setTimeout(() => {
+      setVerseActionMessage('');
+      verseActionMessageTimer.current = null;
+    }, 2200);
+  }
+
+  function closeVerseActions() {
+    setVerseColorMenuOpen(false);
+    setSelectedVerses([]);
+  }
+
   async function copyText(value: string, message: string) {
     try {
       if (window.isSecureContext && navigator.clipboard?.writeText) {
@@ -526,29 +563,40 @@ export function App() {
         textArea.remove();
         if (!copied) throw new Error('copy failed');
       }
-      setVerseActionMessage(message);
+      showVerseActionMessage(message);
     } catch {
-      setVerseActionMessage('Kopieren wurde vom Browser blockiert');
+      showVerseActionMessage('Kopieren wurde vom Browser blockiert');
     }
-    window.setTimeout(() => setVerseActionMessage(''), 2200);
+  }
+
+  async function copySelectedVerses() {
+    const message = `${selectedVerses.length === 1 ? 'Vers' : `${selectedVerses.length} Verse`} kopiert`;
+    await copyText(selectedVerseText(), message);
+    closeVerseActions();
+  }
+
+  async function copySelectedVerseLink() {
+    await copyText(selectedVerseUrl().toString(), 'Link kopiert');
+    closeVerseActions();
   }
 
   async function shareVerse() {
     if (selectedVerses.length === 0) return;
     const text = selectedVerseText();
-    const url = new URL(window.location.href);
-    url.searchParams.set('vers', [...new Set(selectedVerses.map((verse) => verse.verse))].sort((a, b) => a - b).join(','));
-    if (!navigator.share) {
-      await copyText(`${text}\n${url}`, `${selectedVerses.length === 1 ? 'Vers' : 'Verse'} und Link kopiert`);
-      return;
-    }
+    const url = selectedVerseUrl();
     try {
+      if (!navigator.share) {
+        await copyText(`${text}\n${url}`, `${selectedVerses.length === 1 ? 'Vers' : 'Verse'} und Link kopiert`);
+        return;
+      }
       await navigator.share({ title: selectionLabel(), text, url: url.toString() });
-      setVerseActionMessage('Teilen geöffnet');
+      showVerseActionMessage('Teilen geöffnet');
     } catch (reason) {
       if (!(reason instanceof DOMException && reason.name === 'AbortError')) {
         await copyText(`${text}\n${url}`, 'Teilen nicht verfügbar – Inhalt kopiert');
       }
+    } finally {
+      closeVerseActions();
     }
   }
 
@@ -568,9 +616,8 @@ export function App() {
       return next;
     });
     setReaderSettings((current) => ({ ...current, highlight: color }));
-    setVerseColorMenuOpen(false);
-    setVerseActionMessage(`${selectedVerseKeys.length === 1 ? 'Vers' : 'Verse'} ${highlightChoices.find((choice) => choice.id === color)?.name.toLowerCase()} markiert`);
-    window.setTimeout(() => setVerseActionMessage(''), 1800);
+    showVerseActionMessage(`${selectedVerseKeys.length === 1 ? 'Vers' : 'Verse'} ${highlightChoices.find((choice) => choice.id === color)?.name.toLowerCase()} markiert`);
+    closeVerseActions();
   }
 
   function removeVerseMarks() {
@@ -579,9 +626,8 @@ export function App() {
       selectedVerseKeys.forEach((key) => { delete next[key]; });
       return next;
     });
-    setVerseColorMenuOpen(false);
-    setVerseActionMessage('Markierung entfernt');
-    window.setTimeout(() => setVerseActionMessage(''), 1800);
+    showVerseActionMessage('Markierung entfernt');
+    closeVerseActions();
   }
 
   function startSwipe(event: ReactTouchEvent<HTMLElement>) {
@@ -913,18 +959,13 @@ export function App() {
             <b>{selectionLabel()}</b>
             <span role="status">{verseActionMessage || `${selectedVerses.length} ${selectedVerses.length === 1 ? 'Vers' : 'Verse'} ausgewählt`}</span>
           </div>
-          {verseActionMessage && <span className="verse-action-toast" role="status">{verseActionMessage}</span>}
-          <button onClick={() => void copyText(selectedVerseText(), `${selectedVerses.length === 1 ? 'Vers' : `${selectedVerses.length} Verse`} kopiert`)}>
+          <button onClick={() => void copySelectedVerses()}>
             <Copy size={18} /><span>Kopieren</span>
           </button>
           <button onClick={() => void shareVerse()}>
             <Share2 size={18} /><span>Teilen</span>
           </button>
-          <button onClick={() => {
-            const url = new URL(window.location.href);
-            url.searchParams.set('vers', [...new Set(selectedVerses.map((verse) => verse.verse))].sort((a, b) => a - b).join(','));
-            void copyText(url.toString(), 'Link kopiert');
-          }}>
+          <button onClick={() => void copySelectedVerseLink()}>
             <Link2 size={18} /><span>Link</span>
           </button>
           <button className={allSelectedVersesMarked ? 'active' : ''} onClick={toggleVerseMark}>
@@ -933,11 +974,12 @@ export function App() {
           <button className={verseColorMenuOpen ? 'active' : ''} onClick={() => setVerseColorMenuOpen((open) => !open)}>
             <Palette size={18} /><span>Farbe</span>
           </button>
-          <button className="verse-actions-close" onClick={() => { setVerseColorMenuOpen(false); setSelectedVerses([]); }} aria-label="Versauswahl schließen">
+          <button className="verse-actions-close" onClick={closeVerseActions} aria-label="Versauswahl schließen">
             <X size={19} />
           </button>
         </div>
       )}
+      {verseActionMessage && <span className="action-toast" role="status">{verseActionMessage}</span>}
     </div>
   );
 }

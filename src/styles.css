@@ -324,7 +324,12 @@ kbd { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; backg
 .verse-actions > button { display: grid; place-items: center; gap: 3px; min-width: 58px; min-height: 50px; padding: 5px 8px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); cursor: pointer; font-size: 9px; }
 .verse-actions > button:hover, .verse-actions > button.active { background: var(--accent-soft); color: var(--accent); }
 .verse-actions > .verse-actions-close { min-width: 38px; width: 38px; }
-.verse-action-toast { display: none; }
+.action-toast {
+  position: fixed; z-index: 90; bottom: max(24px, env(safe-area-inset-bottom)); left: 50%;
+  max-width: calc(100vw - 32px); padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--paper-strong); box-shadow: var(--shadow); color: var(--ink); font-size: 10px; text-align: center;
+  transform: translateX(-50%);
+}
 .verse-color-menu { position: absolute; right: 48px; bottom: calc(100% + 10px); width: min(320px, calc(100vw - 28px)); padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper-strong); box-shadow: var(--shadow); }
 .verse-color-menu > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .verse-color-menu > div:first-child > span { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; }
@@ -454,7 +459,7 @@ kbd { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; backg
   .verse-actions-reference { display: none; }
   .verse-actions > button { flex: 1; min-width: 0; }
   .verse-actions > .verse-actions-close { flex: 0 0 36px; }
-  .verse-action-toast { position: absolute; right: 8px; bottom: calc(100% + 9px); left: 8px; display: block; padding: 9px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper-strong); box-shadow: var(--shadow); color: var(--ink); font-size: 10px; text-align: center; }
+  .action-toast { bottom: max(18px, env(safe-area-inset-bottom)); }
   .verse-color-menu { right: 0; bottom: calc(100% + 10px); left: 0; width: auto; }
   .verse-entry.has-comments .verse { padding-right: 40px; }
   .study-comment-marker-wrap { right: -2px; }
