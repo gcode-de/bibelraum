@@ -752,7 +752,8 @@ export function App() {
         chapter={chapter}
         translationCode={primaryCode}
         translationName={translations.find((item) => item.code === primaryCode)?.name ?? primaryCode}
-        translationCount={translations.length || 11}
+        translationCount={translations.length || 13}
+        commentaryCount={commentarySources.length || 5}
         excerpt={passage?.translations[0]?.verses.slice(0, 2).map((verse) => verse.text).join(' ') ?? ''}
         theme={theme}
         canInstall={Boolean(installPrompt) && !appInstalled}
@@ -925,7 +926,7 @@ export function App() {
         )}
         <div className="sidebar-note">
           <Library size={15} />
-          <span>{translations.length || 11} deutsche Übersetzungen · vollständig lokal</span>
+          <span>{translations.length || 13} deutsche Übersetzungen · vollständig lokal</span>
         </div>
       </aside>
 
@@ -1257,6 +1258,7 @@ function HomePage({
   translationCode,
   translationName,
   translationCount,
+  commentaryCount,
   excerpt,
   theme,
   canInstall,
@@ -1271,6 +1273,7 @@ function HomePage({
   translationCode: string;
   translationName: string;
   translationCount: number;
+  commentaryCount: number;
   excerpt: string;
   theme: ReaderTheme;
   canInstall: boolean;
@@ -1334,7 +1337,7 @@ function HomePage({
           </article>
           <article>
             <MessageSquareText size={19} />
-            <div><strong>Studienkommentare</strong><span>Hintergründe genau dort, wo du sie brauchst</span></div>
+            <div><strong>{commentaryCount} Kommentarwerke</strong><span>Hintergründe genau dort, wo du sie brauchst</span></div>
           </article>
           <article>
             <Download size={19} />

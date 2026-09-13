@@ -1,5 +1,5 @@
-const SHELL_CACHE = 'das-wort-shell-v2';
-const CONTENT_CACHE = 'das-wort-content-v2';
+const SHELL_CACHE = 'das-wort-shell-v3';
+const CONTENT_CACHE = 'das-wort-content-v3';
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest',

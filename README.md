@@ -1,14 +1,15 @@
 # Das Wort
 
 Das Wort ist eine vollständig lokale Leseoberfläche für die deutschen
-OpenLP-Bibelmodule aus `OpenLP-Bibeln-DE-2026-09-07.zip`. Die Originaldateien im
-Archiv bleiben unverändert. Beim ersten Start werden alle Übersetzungen in eine
+OpenLP-Bibelmodule aus `OpenLP-Bibeln-DE-2026-09-07.zip` und dem optionalen
+Erweiterungsarchiv `Bibeln-und-Studienkommentare-OpenLP.zip`. Die Originaldateien
+bleiben unverändert. Beim ersten Start werden alle Übersetzungen in eine
 gemeinsame, für die Web-App optimierte SQLite-Datenbank importiert.
 
 ## Funktionen
 
 - 66 Bücher mit Buch- und Kapitelauswahl
-- alle 11 enthaltenen deutschen Übersetzungen
+- 13 deutsche Übersetzungen, einschließlich BdF und dem veröffentlichten Umfang der NGÜ
 - Parallelansicht für bis zu drei Übersetzungen
 - Suche innerhalb der gewählten Übersetzung
 - Navigation zum vorherigen und nächsten Kapitel, auch mit den Pfeiltasten
@@ -18,7 +19,8 @@ gemeinsame, für die Web-App optimierte SQLite-Datenbank importiert.
 - responsive Oberfläche für Desktop, Tablet und Smartphone
 - optionaler Dark Mode, dessen Auswahl lokal gespeichert wird
 - anpassbare Schriftart, Schriftgröße und Zeilenhöhe mit lokaler Speicherung
-- optionale MacArthur-Studienkommentare zur Schlachter 2000, bei Hover oder Tipp
+- fünf Kommentarwerke mit Quellenprofil und versbezogenem Schnellzugriff
+- zuschaltbare Kommentarspalte mit Werkauswahl in der Expertenansicht
 - keine Cloud, kein Konto und keine Veränderung der Quelldateien
 
 ## Schnellstart
@@ -54,6 +56,7 @@ Archiv, Datenbank und Port können über Umgebungsvariablen gesetzt werden:
 ```bash
 BIBLE_ARCHIVE="/pfad/meine-bibeln.zip" \
 STUDY_ARCHIVE="/pfad/MacArthur-Studienbibel-SLT2000-OpenLP-2026-09-12.zip" \
+EXTENDED_ARCHIVE="/pfad/Bibeln-und-Studienkommentare-OpenLP.zip" \
 BIBLE_DB="/pfad/das-wort.sqlite" \
 PORT=8080 \
 npm start
@@ -87,8 +90,10 @@ Ein Push auf `main`, ein Tag wie `v1.0.0` oder ein manueller Start unter
 sudo mkdir -p /opt/bibelraum
 sudo cp OpenLP-Bibeln-DE-2026-09-07.zip /opt/bibelraum/
 sudo cp MacArthur-Studienbibel-SLT2000-OpenLP-2026-09-12.zip /opt/bibelraum/
+sudo cp Bibeln-und-Studienkommentare-OpenLP.zip /opt/bibelraum/
 sudo chmod 644 /opt/bibelraum/OpenLP-Bibeln-DE-2026-09-07.zip
 sudo chmod 644 /opt/bibelraum/MacArthur-Studienbibel-SLT2000-OpenLP-2026-09-12.zip
+sudo chmod 644 /opt/bibelraum/Bibeln-und-Studienkommentare-OpenLP.zip
 ```
 
 ### 3. Stack in Portainer anlegen
@@ -105,6 +110,7 @@ Optional lassen sich Pfad, Port und Image-Tag anpassen:
 ```text
 BIBLE_ARCHIVE_PATH=/opt/bibelraum/OpenLP-Bibeln-DE-2026-09-07.zip
 STUDY_ARCHIVE_PATH=/opt/bibelraum/MacArthur-Studienbibel-SLT2000-OpenLP-2026-09-12.zip
+EXTENDED_ARCHIVE_PATH=/opt/bibelraum/Bibeln-und-Studienkommentare-OpenLP.zip
 BIBELRAUM_PORT=4174
 BIBELRAUM_TAG=latest
 ```

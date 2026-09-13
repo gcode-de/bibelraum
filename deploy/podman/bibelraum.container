@@ -10,12 +10,14 @@ PublishPort=4174:4174
 Environment=PORT=4174
 Environment=BIBLE_ARCHIVE=/app/input/bibles.zip
 Environment=STUDY_ARCHIVE=/app/input/study-bible.zip
+Environment=EXTENDED_ARCHIVE=/app/input/extended-study.zip
 Environment=BIBLE_DB=/app/data/bibelraum.sqlite
 Volume=/opt/bibelraum/bibles.zip:/app/input/bibles.zip:ro
 Volume=/opt/bibelraum/study-bible.zip:/app/input/study-bible.zip:ro
+Volume=/opt/bibelraum/extended-study.zip:/app/input/extended-study.zip:ro
 Volume=bibelraum-data.volume:/app/data
 ReadOnly=true
-Tmpfs=/tmp:size=256m,mode=1777
+Tmpfs=/tmp:size=768m,mode=1777
 NoNewPrivileges=true
 AutoUpdate=registry
 HealthCmd=node /app/dist-server/healthcheck.js
