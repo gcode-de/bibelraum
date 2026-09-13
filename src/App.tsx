@@ -36,7 +36,16 @@ import {
 } from './ReaderSettings';
 import type { HighlightColor, ReaderTheme } from './ReaderSettings';
 import { readAppStorage, writeAppStorage } from './storage';
-import type { Book, Passage, PassageLocation, SearchResult, StudyComment, Translation } from './types';
+import type {
+  Book,
+  ChapterStudyComment,
+  CommentarySource,
+  Passage,
+  PassageLocation,
+  SearchResult,
+  StudyComment,
+  Translation,
+} from './types';
 
 const DEFAULT_BOOK = 43;
 const DEFAULT_CHAPTER = 3;
@@ -165,6 +174,12 @@ export function App() {
   const [bookProgress, setBookProgress] = useState(loadBookProgress);
   const [translationOpen, setTranslationOpen] = useState(false);
   const [expertMode, setExpertMode] = useState(getInitialExpertMode);
+  const [commentarySources, setCommentarySources] = useState<CommentarySource[]>([]);
+  const [commentaryOpen, setCommentaryOpen] = useState(false);
+  const [selectedCommentarySlug, setSelectedCommentarySlug] = useState(() => readAppStorage('commentary-source') ?? '');
+  const [chapterComments, setChapterComments] = useState<ChapterStudyComment[]>([]);
+  const [commentaryLoading, setCommentaryLoading] = useState(false);
+  const [commentaryError, setCommentaryError] = useState('');
   const [readerSettingsOpen, setReaderSettingsOpen] = useState(false);
   const [readerSettings, setReaderSettings] = useState(loadReaderSettings);
   const [searchQuery, setSearchQuery] = useState('');
@@ -270,6 +285,22 @@ export function App() {
 
   useEffect(() => {
     const controller = new AbortController();
+    api.commentaries(controller.signal)
+      .then((sources) => {
+        setCommentarySources(sources);
+        setSelectedCommentarySlug((current) => {
+          if (sources.some((source) => source.slug === current)) return current;
+          return [...sources].sort((a, b) => b.verseLinkCount - a.verseLinkCount)[0]?.slug ?? '';
+        });
+      })
+      .catch((reason: Error) => {
+        if (reason.name !== 'AbortError') setCommentaryError(reason.message);
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
     api.books(primaryCode, controller.signal)
       .then((items) => {
         setBooks(items);
@@ -362,7 +393,28 @@ export function App() {
 
   useEffect(() => {
     writeAppStorage('expert-mode', String(expertMode));
+    if (!expertMode) setCommentaryOpen(false);
   }, [expertMode]);
+
+  useEffect(() => {
+    if (selectedCommentarySlug) writeAppStorage('commentary-source', selectedCommentarySlug);
+  }, [selectedCommentarySlug]);
+
+  useEffect(() => {
+    if (!commentaryOpen || !selectedCommentarySlug) return;
+    const controller = new AbortController();
+    setCommentaryLoading(true);
+    setCommentaryError('');
+    api.chapterComments(bookId, chapter, selectedCommentarySlug, controller.signal)
+      .then(setChapterComments)
+      .catch((reason: Error) => {
+        if (reason.name !== 'AbortError') setCommentaryError(reason.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCommentaryLoading(false);
+      });
+    return () => controller.abort();
+  }, [bookId, chapter, commentaryOpen, selectedCommentarySlug]);
 
   useEffect(() => {
     writeAppStorage('translation', primaryCode);
@@ -717,7 +769,7 @@ export function App() {
   }
 
   return (
-    <div className={`app-shell ${readerChromeVisible ? '' : 'chrome-hidden'}`} style={readerStyle}>
+    <div className={`app-shell ${readerChromeVisible ? '' : 'chrome-hidden'} ${commentaryOpen ? 'has-commentary' : ''}`} style={readerStyle}>
       <header className="topbar">
         <button className="icon-button mobile-only" onClick={openBookPicker} aria-label="Bücher öffnen">
           <Menu size={20} />
@@ -762,6 +814,18 @@ export function App() {
           >
             <SlidersHorizontal size={18} />
           </button>
+          {expertMode && (
+            <button
+              className={`icon-button commentary-trigger ${commentaryOpen ? 'active' : ''}`}
+              onClick={() => setCommentaryOpen((open) => !open)}
+              aria-label={commentaryOpen ? 'Kommentarspalte schließen' : 'Kommentarspalte öffnen'}
+              aria-expanded={commentaryOpen}
+              disabled={commentarySources.length === 0}
+            >
+              <MessageSquareText size={18} />
+              {commentarySources.length > 0 && <small>{commentarySources.length}</small>}
+            </button>
+          )}
         </div>
 
       </header>
@@ -970,7 +1034,7 @@ export function App() {
                               <sup>{item.verse}</sup>
                               {item.text}
                             </button>
-                            {item.commentCount > 0 && (
+                            {index === 0 && item.commentCount > 0 && (
                               <StudyCommentMarker
                                 bookId={bookId}
                                 chapter={chapter}
@@ -1000,6 +1064,25 @@ export function App() {
           )}
         </div>
       </main>
+
+      {commentaryOpen && (
+        <CommentaryPanel
+          sources={commentarySources}
+          selectedSlug={selectedCommentarySlug}
+          comments={chapterComments}
+          loading={commentaryLoading}
+          error={commentaryError}
+          bookName={currentBook?.name ?? passage?.book.name ?? 'Bibel'}
+          chapter={chapter}
+          onSelectSource={setSelectedCommentarySlug}
+          onClose={() => setCommentaryOpen(false)}
+          onJumpToVerse={(verse) => {
+            setHighlightedVerse(verse);
+            document.getElementById(`vers-${verse}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (window.matchMedia('(max-width: 760px)').matches) setCommentaryOpen(false);
+          }}
+        />
+      )}
 
       {selectedVerses.length > 0 && (
         <div className="verse-actions" role="toolbar" aria-label={`Aktionen für ${selectionLabel()}`}>
@@ -1050,6 +1133,121 @@ export function App() {
       )}
       {verseActionMessage && <span className="action-toast" role="status">{verseActionMessage}</span>}
     </div>
+  );
+}
+
+function CommentaryPanel({
+  sources,
+  selectedSlug,
+  comments,
+  loading,
+  error,
+  bookName,
+  chapter,
+  onSelectSource,
+  onClose,
+  onJumpToVerse,
+}: {
+  sources: CommentarySource[];
+  selectedSlug: string;
+  comments: ChapterStudyComment[];
+  loading: boolean;
+  error: string;
+  bookName: string;
+  chapter: number;
+  onSelectSource: (slug: string) => void;
+  onClose: () => void;
+  onJumpToVerse: (verse: number) => void;
+}) {
+  const source = sources.find((item) => item.slug === selectedSlug);
+  const groupedComments = useMemo(() => {
+    const groups = new Map<number, ChapterStudyComment[]>();
+    comments.forEach((comment) => {
+      groups.set(comment.verse, [...(groups.get(comment.verse) ?? []), comment]);
+    });
+    return [...groups.entries()];
+  }, [comments]);
+
+  function qualityLabel(value: string) {
+    if (!value) return '';
+    if (value.includes('Publisher-quality')) return 'Verlagstext';
+    if (value.includes('LOCAL-OCR')) return 'Lokale OCR · mögliche Erkennungsfehler';
+    if (value.includes('OCR')) return 'Historische OCR · mögliche Erkennungsfehler';
+    return value;
+  }
+
+  return (
+    <aside className="commentary-panel" aria-label="Kommentarspalte">
+      <span className="commentary-handle mobile-only" aria-hidden="true" />
+      <header className="commentary-heading">
+        <div>
+          <span className="eyebrow">Expertenansicht</span>
+          <h2>Kommentare</h2>
+        </div>
+        <button onClick={onClose} aria-label="Kommentarspalte schließen"><X size={19} /></button>
+      </header>
+
+      <label className="commentary-source-select">
+        <span>Kommentarwerk</span>
+        <select value={selectedSlug} onChange={(event) => onSelectSource(event.target.value)}>
+          {sources.map((item) => <option value={item.slug} key={item.slug}>{item.title}</option>)}
+        </select>
+        <ChevronDown size={16} />
+      </label>
+
+      {source && (
+        <details className="commentary-profile">
+          <summary>
+            <span>
+              <b>{source.author || source.title}</b>
+              <small>
+                {source.scope || `${source.sectionCount.toLocaleString('de-DE')} Abschnitte`}
+                {source.referenceTranslationCode && ` · Referenz: ${source.referenceTranslationCode}`}
+              </small>
+            </span>
+            <ChevronDown size={15} />
+          </summary>
+          {source.theologicalProfile && <p>{source.theologicalProfile}</p>}
+          {qualityLabel(source.sourceQuality) && <span className="commentary-quality"><CircleAlert size={13} /> {qualityLabel(source.sourceQuality)}</span>}
+          {source.mappingWarning && <p>{source.mappingWarning}</p>}
+          {source.sourceUrl && <a href={source.sourceUrl.split(' ; ')[0]} target="_blank" rel="noreferrer"><Link2 size={13} /> Quelle öffnen</a>}
+        </details>
+      )}
+
+      <div className="commentary-location">
+        <BookMarked size={15} />
+        <span><b>{bookName} {chapter}</b><small>{groupedComments.length} kommentierte Verse</small></span>
+      </div>
+
+      <div className="commentary-content" aria-live="polite">
+        {loading && <div className="commentary-state"><LoaderCircle size={20} /> Kommentare werden geladen …</div>}
+        {error && <div className="commentary-state error"><CircleAlert size={20} /> {error}</div>}
+        {!loading && !error && groupedComments.length === 0 && (
+          <div className="commentary-state">
+            <MessageSquareText size={23} />
+            <b>Keine direkte Verknüpfung</b>
+            <span>Dieses Werk enthält für das aktuelle Kapitel keine sicher zugeordneten Verskommentare.</span>
+          </div>
+        )}
+        {!loading && !error && groupedComments.map(([verse, verseComments]) => (
+          <section className="commentary-verse-group" key={verse}>
+            <button onClick={() => onJumpToVerse(verse)}>Vers {verse}</button>
+            {verseComments.map((comment) => (
+              <article key={comment.id}>
+                {comment.heading && <h3>{comment.heading}</h3>}
+                <p>{comment.text}</p>
+                {(comment.page || comment.sourceUrl) && (
+                  <footer>
+                    {comment.page && <span>Seite {comment.page}</span>}
+                    {comment.sourceUrl && <a href={comment.sourceUrl.split(' ; ')[0]} target="_blank" rel="noreferrer">Quelle</a>}
+                  </footer>
+                )}
+              </article>
+            ))}
+          </section>
+        ))}
+      </div>
+    </aside>
   );
 }
 
@@ -1216,13 +1414,18 @@ function StudyCommentMarker({ bookId, chapter, verse, count }: {
           <article key={comment.id}>
             <div className="comment-source">
               <b>{comment.sourceTitle}</b>
-              {comment.author && <span>{comment.author}</span>}
+              {(comment.author || comment.page) && <span>{[comment.author, comment.page ? `Seite ${comment.page}` : ''].filter(Boolean).join(' · ')}</span>}
             </div>
+            {comment.heading && <h3>{comment.heading}</h3>}
             <p>{comment.text}</p>
             <details>
-              <summary>Quelle und Nutzungshinweise</summary>
+              <summary>Einordnung, Quelle und Nutzung</summary>
+              {comment.theologicalProfile && <p>{comment.theologicalProfile}</p>}
+              {comment.scope && <p>Umfang: {comment.scope}</p>}
+              {comment.sourceQuality && <p>Textqualität: {comment.sourceQuality}</p>}
               {comment.copyright && <p>{comment.copyright}</p>}
               {comment.usageNotice && <p>{comment.usageNotice}</p>}
+              {comment.sourceUrl && <p><a href={comment.sourceUrl.split(' ; ')[0]} target="_blank" rel="noreferrer">Quelle öffnen</a></p>}
             </details>
           </article>
         ))}
