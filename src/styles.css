@@ -318,6 +318,9 @@ kbd { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; backg
 .recent-translations button { min-width: 60px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 18px; background: var(--paper); color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: .06em; }
 .recent-translations button.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .translation-list { display: grid; gap: 5px; }
+.translation-language-group { display: grid; gap: 5px; }
+.translation-language-group + .translation-language-group { margin-top: 11px; padding-top: 15px; border-top: 1px solid var(--line-soft); }
+.translation-language-group > h3 { margin: 0 7px 4px; color: var(--faint); font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .13em; }
 .translation-option { display: grid; grid-template-columns: 1fr; gap: 5px; border: 1px solid transparent; border-radius: 9px; }
 .translation-menu.is-expert .translation-option { grid-template-columns: 1fr 35px; }
 .translation-option:hover, .translation-option.primary { border-color: var(--line); background: var(--paper); }

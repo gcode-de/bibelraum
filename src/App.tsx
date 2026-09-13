@@ -752,8 +752,8 @@ export function App() {
         chapter={chapter}
         translationCode={primaryCode}
         translationName={translations.find((item) => item.code === primaryCode)?.name ?? primaryCode}
-        translationCount={translations.length || 13}
-        commentaryCount={commentarySources.length || 5}
+        translationCount={translations.length || 16}
+        commentaryCount={commentarySources.length || 9}
         excerpt={passage?.translations[0]?.verses.slice(0, 2).map((verse) => verse.text).join(' ') ?? ''}
         theme={theme}
         canInstall={Boolean(installPrompt) && !appInstalled}
@@ -926,7 +926,7 @@ export function App() {
         )}
         <div className="sidebar-note">
           <Library size={15} />
-          <span>{translations.length || 13} deutsche Übersetzungen · vollständig lokal</span>
+          <span>{translations.length || 16} Übersetzungen · Deutsch &amp; English · vollständig lokal</span>
         </div>
       </aside>
 
@@ -1191,7 +1191,14 @@ function CommentaryPanel({
       <label className="commentary-source-select">
         <span>Kommentarwerk</span>
         <select value={selectedSlug} onChange={(event) => onSelectSource(event.target.value)}>
-          {sources.map((item) => <option value={item.slug} key={item.slug}>{item.title}</option>)}
+          {(['de', 'en'] as const).map((languageCode) => {
+            const languageSources = sources.filter((item) => item.languageCode === languageCode);
+            return languageSources.length > 0 && (
+              <optgroup label={languageCode === 'de' ? 'Deutsch' : 'English'} key={languageCode}>
+                {languageSources.map((item) => <option value={item.slug} key={item.slug}>{item.title}</option>)}
+              </optgroup>
+            );
+          })}
         </select>
         <ChevronDown size={16} />
       </label>
@@ -1202,7 +1209,7 @@ function CommentaryPanel({
             <span>
               <b>{source.author || source.title}</b>
               <small>
-                {source.scope || `${source.sectionCount.toLocaleString('de-DE')} Abschnitte`}
+                {source.languageCode === 'en' ? 'English' : 'Deutsch'} · {source.scope || `${source.sectionCount.toLocaleString('de-DE')} Abschnitte`}
                 {source.referenceTranslationCode && ` · Referenz: ${source.referenceTranslationCode}`}
               </small>
             </span>
@@ -1574,6 +1581,13 @@ function TranslationMenu({ translations, selectedCodes, recentCodes, expertMode,
   const recent = recentCodes
     .map((code) => translations.find((translation) => translation.code === code))
     .filter((translation): translation is Translation => Boolean(translation));
+  const languageGroups = ([
+    { code: 'de', label: 'Deutsch' },
+    { code: 'en', label: 'English' },
+  ] as const).map((language) => ({
+    ...language,
+    translations: translations.filter((translation) => translation.languageCode === language.code),
+  })).filter((language) => language.translations.length > 0);
 
   return (
     <div className={`translation-menu ${expertMode ? 'is-expert' : ''}`} role="dialog" aria-modal="true" aria-labelledby="translation-menu-title">
@@ -1605,30 +1619,35 @@ function TranslationMenu({ translations, selectedCodes, recentCodes, expertMode,
         </div>
       )}
       <div className="translation-list">
-        {translations.map((translation) => {
-          const isPrimary = selectedCodes[0] === translation.code;
-          const isSelected = selectedCodes.includes(translation.code);
-          return (
-            <div className={`translation-option ${isPrimary ? 'primary' : ''}`} key={translation.code}>
-              <button className="choose-translation" onClick={() => onChoosePrimary(translation.code)}>
-                <span className="option-code">{translation.code}</span>
-                <span><b>{translation.name}</b><small>{translation.verseCount.toLocaleString('de-DE')} Verse</small></span>
-                {isPrimary && <Check size={16} />}
-              </button>
-              {expertMode && (
-                <button
-                  className={`compare-button ${isSelected ? 'selected' : ''}`}
-                  onClick={() => onToggleComparison(translation.code)}
-                  disabled={!isSelected && selectedCodes.length >= 3}
-                  aria-label={`${translation.name} ${isSelected ? 'aus Vergleich entfernen' : 'vergleichen'}`}
-                  title="Parallel vergleichen"
-                >
-                  {isSelected ? <Check size={15} /> : <Plus size={15} />}
-                </button>
-              )}
-            </div>
-          );
-        })}
+        {languageGroups.map((language) => (
+          <section className="translation-language-group" key={language.code}>
+            <h3>{language.label}</h3>
+            {language.translations.map((translation) => {
+              const isPrimary = selectedCodes[0] === translation.code;
+              const isSelected = selectedCodes.includes(translation.code);
+              return (
+                <div className={`translation-option ${isPrimary ? 'primary' : ''}`} key={translation.code}>
+                  <button className="choose-translation" onClick={() => onChoosePrimary(translation.code)}>
+                    <span className="option-code">{translation.code}</span>
+                    <span><b>{translation.name}</b><small>{translation.verseCount.toLocaleString('de-DE')} Verse</small></span>
+                    {isPrimary && <Check size={16} />}
+                  </button>
+                  {expertMode && (
+                    <button
+                      className={`compare-button ${isSelected ? 'selected' : ''}`}
+                      onClick={() => onToggleComparison(translation.code)}
+                      disabled={!isSelected && selectedCodes.length >= 3}
+                      aria-label={`${translation.name} ${isSelected ? 'aus Vergleich entfernen' : 'vergleichen'}`}
+                      title="Parallel vergleichen"
+                    >
+                      {isSelected ? <Check size={15} /> : <Plus size={15} />}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </section>
+        ))}
       </div>
     </div>
   );
