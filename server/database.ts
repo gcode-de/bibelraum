@@ -25,7 +25,30 @@ const translationCodes: Record<string, string> = {
   'Literal Standard Version': 'LSV',
 };
 
-const DATABASE_SCHEMA_VERSION = '4';
+const DATABASE_SCHEMA_VERSION = '5';
+
+export type StudyReferenceRange = {
+  startChapter: number;
+  startVerse: number;
+  endChapter: number;
+  endVerse: number;
+};
+
+export function parseLeadingStudyReference(text: string): StudyReferenceRange | null {
+  const match = text.match(
+    /^\s*(\d{1,3})\s*,\s*(\d{1,3})[a-z]?(?:\s*[-–]\s*(?:(\d{1,3})\s*,\s*)?(\d{1,3})[a-z]?)?\s*:/i,
+  );
+  if (!match) return null;
+
+  const startChapter = Number(match[1]);
+  const startVerse = Number(match[2]);
+  const endChapter = match[4] ? Number(match[3] || startChapter) : startChapter;
+  const endVerse = match[4] ? Number(match[4]) : startVerse;
+  const startPosition = startChapter * 1000 + startVerse;
+  const endPosition = endChapter * 1000 + endVerse;
+  if (startChapter < 1 || startVerse < 1 || endPosition < startPosition) return null;
+  return { startChapter, startVerse, endChapter, endVerse };
+}
 
 export function createSchema(db: DatabaseSync) {
   db.exec(`
@@ -206,6 +229,80 @@ function readSourceMetadata(db: DatabaseSync) {
   return Object.fromEntries(rows.map(({ key, value }) => [key, value ?? '']));
 }
 
+function refineMacArthurStudyLinks(
+  db: DatabaseSync,
+  sourceId: number,
+  title: string,
+  author: string,
+  fallbackSourceUrl: string,
+) {
+  if (!/MacArthur/i.test(`${title} ${author}`)) return 0;
+
+  const comments = db.prepare(`
+    SELECT destination.id AS destinationId,
+           source_comment.id AS sourceCommentId,
+           source_comment.text,
+           COUNT(DISTINCT source_link.book_id) AS bookCount,
+           MIN(source_link.book_id) AS bookId,
+           COALESCE(NULLIF(MIN(source_link.source_url), ''), ?) AS sourceUrl
+    FROM source.study_comment source_comment
+    JOIN source.study_comment_link source_link ON source_link.comment_id = source_comment.id
+    JOIN study_comments destination
+      ON destination.source_id = ?
+     AND destination.source_comment_id = source_comment.id
+    GROUP BY source_comment.id, destination.id
+  `).all(fallbackSourceUrl, sourceId) as Array<{
+    destinationId: number;
+    sourceCommentId: number;
+    text: string;
+    bookCount: number;
+    bookId: number;
+    sourceUrl: string;
+  }>;
+  const verses = db.prepare(`
+    SELECT source_book.book_reference_id AS bookRefId, source_verse.chapter, source_verse.verse
+    FROM source.verse source_verse
+    JOIN source.book source_book ON source_book.id = source_verse.book_id
+    WHERE source_verse.book_id = ?
+      AND source_verse.chapter * 1000 + source_verse.verse BETWEEN ? AND ?
+    ORDER BY source_verse.chapter, source_verse.verse
+  `);
+  const deleteLinks = db.prepare('DELETE FROM study_comment_links WHERE comment_id = ?');
+  const insertLink = db.prepare(`
+    INSERT INTO study_comment_links (comment_id, book_ref_id, chapter, verse, source_url)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  const updateQuality = db.prepare(`
+    UPDATE study_comments SET mapping_quality = 'leading-reference-exact' WHERE id = ?
+  `);
+  let refinedCount = 0;
+
+  for (const comment of comments) {
+    const reference = parseLeadingStudyReference(comment.text);
+    if (!reference || comment.bookCount !== 1) continue;
+    const mappedVerses = verses.all(
+      comment.bookId,
+      reference.startChapter * 1000 + reference.startVerse,
+      reference.endChapter * 1000 + reference.endVerse,
+    ) as Array<{ bookRefId: number; chapter: number; verse: number }>;
+    if (mappedVerses.length === 0) continue;
+
+    deleteLinks.run(comment.destinationId);
+    for (const mappedVerse of mappedVerses) {
+      insertLink.run(
+        comment.destinationId,
+        mappedVerse.bookRefId,
+        mappedVerse.chapter,
+        mappedVerse.verse,
+        comment.sourceUrl,
+      );
+    }
+    updateQuality.run(comment.destinationId);
+    refinedCount += 1;
+  }
+  return refinedCount;
+}
+
 function importModule(db: DatabaseSync, modulePath: string) {
   db.prepare('ATTACH DATABASE ? AS source').run(modulePath);
   try {
@@ -257,6 +354,7 @@ function importStudyModule(db: DatabaseSync, modulePath: string) {
     const metadata = readStudyMetadata(db);
     const bibleMetadata = readSourceMetadata(db);
     const title = metadata.study_title || metadata.title || 'Studienkommentar';
+    const author = metadata.study_author || metadata.author || '';
     const sourceName = bibleMetadata.name || 'Schlachter 2000';
     const translationCode = resolveTranslationCode(sourceName);
     const copyright = [
@@ -270,7 +368,7 @@ function importStudyModule(db: DatabaseSync, modulePath: string) {
     const sourceQuality = readStudySourceValue(db, 'source_quality');
     const commentColumns = sourceColumnNames(db, 'study_comment');
     const linkColumns = sourceColumnNames(db, 'study_comment_link');
-    const slug = slugify(`${title}-${metadata.study_author || metadata.author || translationCode}`);
+    const slug = slugify(`${title}-${author || translationCode}`);
 
     db.exec('BEGIN');
     const sourceResult = db.prepare(`
@@ -284,7 +382,7 @@ function importStudyModule(db: DatabaseSync, modulePath: string) {
       translationCode,
       resolveLanguageCode(bibleMetadata),
       title,
-      metadata.study_author || metadata.author || '',
+      author,
       copyright || metadata.rights || metadata.license || sourceLicense || '',
       usageNotice,
       metadata.scope || '',
@@ -320,6 +418,7 @@ function importStudyModule(db: DatabaseSync, modulePath: string) {
        AND destination_comment.source_comment_id = source_link.comment_id
       ORDER BY source_book.book_reference_id, source_link.chapter, source_link.verse
     `).run(...(linkColumns.has('source_url') ? [sourceId] : [sourceUrl, sourceId]));
+    refineMacArthurStudyLinks(db, sourceId, title, author, sourceUrl);
     db.exec('COMMIT');
     return slug;
   } catch (error) {
