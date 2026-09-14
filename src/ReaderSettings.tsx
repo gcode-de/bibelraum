@@ -123,7 +123,8 @@ export function ReaderSettingsPanel({ settings, theme, onChange, onThemeChange, 
           lineHeight: settings.lineHeight,
         }}
       >
-        <sup>16</sup> Denn also hat Gott die Welt geliebt.
+        <span><sup>1</sup>Im Anfang war das Wort.</span>
+        <span><sup>2</sup>Er war im Anfang bei Gott.</span>
       </div>
 
       <div className="settings-group appearance-group">
@@ -206,6 +207,7 @@ export function ReaderSettingsPanel({ settings, theme, onChange, onThemeChange, 
               <button className={settings.textWidth === value ? 'selected' : ''} onClick={() => update('textWidth', value)} key={value}>{label}</button>
             ))}
           </div>
+          <small className="settings-hint">Regelt die Zeilenlänge auf größeren Bildschirmen. Auf dem Handy nutzt der Text immer die verfügbare Breite.</small>
         </div>
         <div>
           <div className="settings-label"><span>Textausrichtung</span></div>
@@ -217,10 +219,7 @@ export function ReaderSettingsPanel({ settings, theme, onChange, onThemeChange, 
       </div>
 
       <div className="settings-group">
-        <div className="settings-label">
-          <span>Zeilenabstand</span>
-          <output>{settings.lineHeight.toFixed(1).replace('.', ',')}</output>
-        </div>
+        <div className="settings-label"><span>Zeilenabstand</span></div>
         <div className="line-height-presets" aria-label="Zeilenabstand wählen">
           {lineHeightPresets.map((preset) => (
             <button
@@ -233,7 +232,6 @@ export function ReaderSettingsPanel({ settings, theme, onChange, onThemeChange, 
               <i className={`line-spacing-icon spacing-${String(preset).replace('.', '-')}`} aria-hidden="true">
                 <span /><span /><span /><span />
               </i>
-              <small>{preset.toFixed(1).replace('.', ',')}</small>
             </button>
           ))}
         </div>
