@@ -215,6 +215,7 @@ export function App() {
   const readerStyle = {
     '--reader-font-size': `${readerSettings.fontSize}px`,
     '--reader-line-height': String(readerSettings.lineHeight),
+    '--reader-verse-gap': `${(0.1 + (readerSettings.lineHeight - 1.2) * 0.5).toFixed(2)}em`,
     '--reader-font-family': readerFontStacks[readerSettings.fontFamily],
     '--reader-max-width': ({ narrow: '620px', medium: '760px', wide: '900px' })[readerSettings.textWidth],
     '--reader-text-align': readerSettings.textAlign,
@@ -279,7 +280,9 @@ export function App() {
           setSelectedCodes([DEFAULT_TRANSLATION]);
         }
       })
-      .catch((reason: Error) => setError(reason.message));
+      .catch((reason: Error) => {
+        if (reason.name !== 'AbortError') setError(reason.message);
+      });
     return () => controller.abort();
   }, []);
 
@@ -1371,7 +1374,18 @@ function StudyCommentMarker({ bookId, chapter, verse, count }: {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [pinned, setPinned] = useState(false);
+  const [selectedSourceSlug, setSelectedSourceSlug] = useState('');
   const requestController = useRef<AbortController | null>(null);
+
+  const commentSources = useMemo(() => {
+    const sources = new Map<string, string>();
+    comments?.forEach((comment) => sources.set(comment.sourceSlug, comment.sourceTitle));
+    return [...sources.entries()].map(([slug, title]) => ({ slug, title }));
+  }, [comments]);
+  const effectiveSourceSlug = selectedSourceSlug || commentSources[0]?.slug || '';
+  const visibleComments = effectiveSourceSlug === '*'
+    ? comments
+    : comments?.filter((comment) => comment.sourceSlug === effectiveSourceSlug);
 
   useEffect(() => () => requestController.current?.abort(), []);
 
@@ -1415,12 +1429,24 @@ function StudyCommentMarker({ bookId, chapter, verse, count }: {
       </button>
       <aside className="study-comment-popover" aria-live="polite">
         <header>
-          <span><BookMarked size={15} /> Studienkommentar zu Vers {verse}</span>
-          <button onClick={() => setPinned(false)} aria-label="Kommentar schließen"><X size={17} /></button>
+          <div className="comment-popover-title">
+            <span><BookMarked size={15} /> Studienkommentar zu Vers {verse}</span>
+            <button onClick={() => setPinned(false)} aria-label="Kommentar schließen"><X size={17} /></button>
+          </div>
+          {commentSources.length > 1 && (
+            <label className="comment-source-filter">
+              <span>Kommentarwerk</span>
+              <select value={effectiveSourceSlug} onChange={(event) => setSelectedSourceSlug(event.target.value)}>
+                {commentSources.map((source) => <option value={source.slug} key={source.slug}>{source.title}</option>)}
+                <option value="*">Alle {commentSources.length} Werke anzeigen</option>
+              </select>
+              <ChevronDown size={15} />
+            </label>
+          )}
         </header>
         {loading && <div className="comment-loading"><LoaderCircle size={18} /> Kommentar wird geladen …</div>}
         {error && <p className="comment-error">{error}</p>}
-        {comments?.map((comment) => (
+        {visibleComments?.map((comment) => (
           <article key={comment.id}>
             <div className="comment-source">
               <b>{comment.sourceTitle}</b>

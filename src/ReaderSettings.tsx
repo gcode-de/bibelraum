@@ -26,13 +26,15 @@ export type ReaderTheme = 'light' | 'sepia' | 'gray' | 'dark' | 'black';
 
 export const defaultReaderSettings: ReaderSettings = {
   fontSize: 20,
-  lineHeight: 1.73,
+  lineHeight: 1.4,
   fontFamily: 'book',
   accent: 'terracotta',
   highlight: 'yellow',
   textWidth: 'medium',
   textAlign: 'left',
 };
+
+const lineHeightPresets = [1.2, 1.4, 1.6, 1.8] as const;
 
 export const readerFontStacks: Record<ReaderSettings['fontFamily'], string> = {
   book: "Iowan Old Style, Palatino Linotype, Georgia, serif",
@@ -66,7 +68,7 @@ export function loadReaderSettings(): ReaderSettings {
       : defaultReaderSettings.fontFamily;
     return {
       fontSize: clamp(Number(saved.fontSize) || defaultReaderSettings.fontSize, 16, 30),
-      lineHeight: clamp(Number(saved.lineHeight) || defaultReaderSettings.lineHeight, 1.35, 2.1),
+      lineHeight: nearestLineHeightPreset(Number(saved.lineHeight) || defaultReaderSettings.lineHeight),
       fontFamily,
       accent: saved.accent === 'blue' || saved.accent === 'green' ? saved.accent : 'terracotta',
       highlight: highlightChoices.some((choice) => choice.id === saved.highlight)
@@ -78,6 +80,11 @@ export function loadReaderSettings(): ReaderSettings {
   } catch {
     return defaultReaderSettings;
   }
+}
+
+function nearestLineHeightPreset(value: number) {
+  return lineHeightPresets.reduce((nearest, preset) =>
+    Math.abs(preset - value) < Math.abs(nearest - value) ? preset : nearest);
 }
 
 function clamp(value: number, minimum: number, maximum: number) {
@@ -212,19 +219,24 @@ export function ReaderSettingsPanel({ settings, theme, onChange, onThemeChange, 
       <div className="settings-group">
         <div className="settings-label">
           <span>Zeilenabstand</span>
-          <output>{settings.lineHeight.toFixed(2).replace('.', ',')}</output>
+          <output>{settings.lineHeight.toFixed(1).replace('.', ',')}</output>
         </div>
-        <input
-          className="line-height-slider"
-          type="range"
-          min="1.35"
-          max="2.1"
-          step="0.05"
-          value={settings.lineHeight}
-          onChange={(event) => update('lineHeight', Number(event.target.value))}
-          aria-label="Zeilenabstand"
-        />
-        <div className="range-labels" aria-hidden="true"><span>Kompakt</span><span>Weit</span></div>
+        <div className="line-height-presets" aria-label="Zeilenabstand wählen">
+          {lineHeightPresets.map((preset) => (
+            <button
+              className={settings.lineHeight === preset ? 'selected' : ''}
+              onClick={() => update('lineHeight', preset)}
+              aria-label={`Zeilenabstand ${preset.toFixed(1).replace('.', ',')}`}
+              aria-pressed={settings.lineHeight === preset}
+              key={preset}
+            >
+              <i className={`line-spacing-icon spacing-${String(preset).replace('.', '-')}`} aria-hidden="true">
+                <span /><span /><span /><span />
+              </i>
+              <small>{preset.toFixed(1).replace('.', ',')}</small>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="settings-group">
